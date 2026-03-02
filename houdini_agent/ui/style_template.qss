@@ -2231,6 +2231,43 @@ QDialog#pluginManagerDlg QCheckBox::indicator:checked {
     border-color: #d4a574;
 }
 
+/* Plugin Manager Tab Widget */
+QTabWidget#pluginManagerTabs::pane {
+    background: transparent;
+    border: 1px solid rgba(180,160,130,10);
+    border-radius: 4px;
+    top: -1px;
+}
+QTabWidget#pluginManagerTabs > QTabBar::tab {
+    background: rgba(30,26,20,180);
+    color: #8a7e6e;
+    border: 1px solid rgba(180,160,130,10);
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding: 5px 14px;
+    margin-right: 2px;
+    font-size: {FS_SM}px;
+}
+QTabWidget#pluginManagerTabs > QTabBar::tab:selected {
+    background: rgba(212,165,116,20);
+    color: #d4c5b0;
+    border-color: rgba(212,165,116,30);
+}
+QTabWidget#pluginManagerTabs > QTabBar::tab:hover:!selected {
+    background: rgba(180,160,130,12);
+    color: #b4a082;
+}
+/* Skill dir input */
+QLineEdit#skillDirEdit {
+    background: rgba(30,26,20,200);
+    border: 1px solid rgba(180,160,130,12);
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: #d4c5b0;
+    font-size: {FS_XS}px;
+}
+
 
 /* ============================================================
    RULES EDITOR DIALOG (warm khaki — redesigned)

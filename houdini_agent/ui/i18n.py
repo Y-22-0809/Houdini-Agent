@@ -564,9 +564,18 @@ _ZH = {
     'plugin.settings': '设置',
     'plugin.toggle_tip': '启用/禁用此插件',
     'plugin.no_plugins': '暂无插件\n将 .py 文件放入 plugins/ 目录即可',
-    'plugin.load_error': '加载插件列表失败',
+    'plugin.load_error': '加载列表失败',
     'plugin.cancel': '取消',
     'plugin.save': '保存',
+    'plugin.tab_plugins': '插件',
+    'plugin.tab_tools': '工具',
+    'plugin.tab_skills': 'Skills',
+    'plugin.no_tools': '暂无注册工具',
+    'plugin.no_skills': '暂无加载 Skill',
+    'plugin.tool_toggle_tip': '启用/禁用此工具',
+    'plugin.skill_dir_label': '用户 Skill 目录:',
+    'plugin.skill_dir_placeholder': '（未设置，仅使用内置 Skill）',
+    'plugin.skill_dir_browse': '浏览选择目录',
 }
 
 
@@ -1067,9 +1076,18 @@ _EN = {
     'plugin.settings': 'Settings',
     'plugin.toggle_tip': 'Enable/Disable this plugin',
     'plugin.no_plugins': 'No plugins found\nPlace .py files in plugins/ directory',
-    'plugin.load_error': 'Failed to load plugins',
+    'plugin.load_error': 'Failed to load list',
     'plugin.cancel': 'Cancel',
     'plugin.save': 'Save',
+    'plugin.tab_plugins': 'Plugins',
+    'plugin.tab_tools': 'Tools',
+    'plugin.tab_skills': 'Skills',
+    'plugin.no_tools': 'No tools registered',
+    'plugin.no_skills': 'No skills loaded',
+    'plugin.tool_toggle_tip': 'Enable/Disable this tool',
+    'plugin.skill_dir_label': 'User Skill Dir:',
+    'plugin.skill_dir_placeholder': '(Not set, using built-in skills only)',
+    'plugin.skill_dir_browse': 'Browse directory',
 }
 
 # 启动时自动恢复语言设置

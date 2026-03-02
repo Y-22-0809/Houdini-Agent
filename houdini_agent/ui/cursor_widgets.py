@@ -6576,8 +6576,8 @@ class PluginManagerDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setObjectName("pluginManagerDlg")
         self.setWindowTitle(tr('plugin.manager_title'))
-        self.setMinimumSize(460, 340)
-        self.resize(500, 400)
+        self.setMinimumSize(540, 420)
+        self.resize(580, 460)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
@@ -6594,20 +6594,89 @@ class PluginManagerDialog(QtWidgets.QDialog):
         sep.setStyleSheet("color: rgba(180,160,130,12);")
         layout.addWidget(sep)
 
-        # 插件列表滚动区域
+        # ★ Tab Widget — Plugins / Tools / Skills
+        self._tabs = QtWidgets.QTabWidget()
+        self._tabs.setObjectName("pluginManagerTabs")
+        layout.addWidget(self._tabs, 1)
+
+        # ── Tab 1: Plugins ──
+        plugins_page = QtWidgets.QWidget()
+        plugins_lay = QtWidgets.QVBoxLayout(plugins_page)
+        plugins_lay.setContentsMargins(0, 6, 0, 0)
+        plugins_lay.setSpacing(4)
+
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setObjectName("pluginListScroll")
         scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
         self._list_container = QtWidgets.QWidget()
         self._list_layout = QtWidgets.QVBoxLayout(self._list_container)
         self._list_layout.setContentsMargins(0, 0, 0, 0)
         self._list_layout.setSpacing(4)
         scroll.setWidget(self._list_container)
-        layout.addWidget(scroll, 1)
+        plugins_lay.addWidget(scroll, 1)
 
-        # 底部按钮栏
+        self._tabs.addTab(plugins_page, tr('plugin.tab_plugins'))
+
+        # ── Tab 2: Tools ──
+        tools_page = QtWidgets.QWidget()
+        tools_lay = QtWidgets.QVBoxLayout(tools_page)
+        tools_lay.setContentsMargins(0, 6, 0, 0)
+        tools_lay.setSpacing(4)
+
+        tools_scroll = QtWidgets.QScrollArea()
+        tools_scroll.setWidgetResizable(True)
+        tools_scroll.setObjectName("toolListScroll")
+        tools_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        self._tools_container = QtWidgets.QWidget()
+        self._tools_layout = QtWidgets.QVBoxLayout(self._tools_container)
+        self._tools_layout.setContentsMargins(0, 0, 0, 0)
+        self._tools_layout.setSpacing(2)
+        tools_scroll.setWidget(self._tools_container)
+        tools_lay.addWidget(tools_scroll, 1)
+
+        self._tabs.addTab(tools_page, tr('plugin.tab_tools'))
+
+        # ── Tab 3: Skills ──
+        skills_page = QtWidgets.QWidget()
+        skills_lay = QtWidgets.QVBoxLayout(skills_page)
+        skills_lay.setContentsMargins(0, 6, 0, 0)
+        skills_lay.setSpacing(4)
+
+        skills_scroll = QtWidgets.QScrollArea()
+        skills_scroll.setWidgetResizable(True)
+        skills_scroll.setObjectName("skillListScroll")
+        skills_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        self._skills_container = QtWidgets.QWidget()
+        self._skills_layout = QtWidgets.QVBoxLayout(self._skills_container)
+        self._skills_layout.setContentsMargins(0, 0, 0, 0)
+        self._skills_layout.setSpacing(2)
+        skills_scroll.setWidget(self._skills_container)
+        skills_lay.addWidget(skills_scroll, 1)
+
+        # Skill 目录配置
+        skill_dir_row = QtWidgets.QHBoxLayout()
+        skill_dir_row.setSpacing(6)
+        skill_dir_lbl = QtWidgets.QLabel(tr('plugin.skill_dir_label'))
+        skill_dir_lbl.setStyleSheet("color: #8a7e6e; font-size: 11px; background: transparent;")
+        skill_dir_row.addWidget(skill_dir_lbl)
+        self._skill_dir_edit = QtWidgets.QLineEdit()
+        self._skill_dir_edit.setObjectName("skillDirEdit")
+        self._skill_dir_edit.setPlaceholderText(tr('plugin.skill_dir_placeholder'))
+        self._skill_dir_edit.setReadOnly(True)
+        skill_dir_row.addWidget(self._skill_dir_edit, 1)
+        btn_browse_skill = QtWidgets.QPushButton("📂")
+        btn_browse_skill.setObjectName("pluginBtnSmall")
+        btn_browse_skill.setFixedSize(26, 26)
+        btn_browse_skill.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_browse_skill.setToolTip(tr('plugin.skill_dir_browse'))
+        btn_browse_skill.clicked.connect(self._browse_skill_dir)
+        skill_dir_row.addWidget(btn_browse_skill)
+        skills_lay.addLayout(skill_dir_row)
+
+        self._tabs.addTab(skills_page, tr('plugin.tab_skills'))
+
+        # ── 底部按钮栏 ──
         bottom = QtWidgets.QHBoxLayout()
         bottom.setSpacing(8)
 
@@ -6626,6 +6695,9 @@ class PluginManagerDialog(QtWidgets.QDialog):
         bottom.addWidget(btn_reload_all)
 
         layout.addLayout(bottom)
+
+        # Tab 切换刷新
+        self._tabs.currentChanged.connect(self._on_tab_changed)
 
         # 加载插件列表
         self._refresh_list()
@@ -6772,6 +6844,242 @@ class PluginManagerDialog(QtWidgets.QDialog):
                 subprocess.Popen(['xdg-open', str(plugins_dir)])
         except Exception as e:
             print(f"[PluginManager] Open dir error: {e}")
+
+    def _on_tab_changed(self, index: int):
+        """Tab 切换时刷新对应列表"""
+        if index == 1:
+            self._refresh_tools_list()
+        elif index == 2:
+            self._refresh_skills_list()
+
+    # ---------- Tools Tab ----------
+
+    def _refresh_tools_list(self):
+        """刷新工具列表"""
+        while self._tools_layout.count():
+            item = self._tools_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        try:
+            from ..utils.tool_registry import get_tool_registry
+            reg = get_tool_registry()
+            tools = reg.list_all()
+        except Exception as e:
+            lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
+            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
+            self._tools_layout.addWidget(lbl)
+            self._tools_layout.addStretch()
+            return
+
+        if not tools:
+            lbl = QtWidgets.QLabel(tr('plugin.no_tools'))
+            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            self._tools_layout.addWidget(lbl)
+        else:
+            # 按来源分组
+            groups = {}
+            for t in tools:
+                source = t.get("source", "core")
+                groups.setdefault(source, []).append(t)
+
+            source_labels = {
+                "core": "🔧 Core Tools",
+                "skill": "🧠 Skills",
+                "plugin": "🔌 Plugin Tools",
+                "user": "👤 User Tools",
+            }
+
+            for source in ("core", "skill", "plugin", "user"):
+                items = groups.get(source, [])
+                if not items:
+                    continue
+
+                # 组标题
+                group_lbl = QtWidgets.QLabel(source_labels.get(source, source))
+                group_lbl.setStyleSheet(
+                    "color: #b4a082; font-size: 12px; font-weight: bold; "
+                    "padding: 6px 4px 2px; background: transparent;"
+                )
+                self._tools_layout.addWidget(group_lbl)
+
+                for t in items:
+                    row = self._create_tool_row(t)
+                    self._tools_layout.addWidget(row)
+
+        self._tools_layout.addStretch()
+
+    def _create_tool_row(self, info: dict) -> QtWidgets.QWidget:
+        """创建单个工具行"""
+        row = QtWidgets.QFrame()
+        row.setObjectName("pluginRow")
+
+        h = QtWidgets.QHBoxLayout(row)
+        h.setContentsMargins(10, 4, 10, 4)
+        h.setSpacing(6)
+
+        name = info.get("name", "")
+        desc = info.get("description", "")[:80]
+        enabled = info.get("enabled", True)
+        modes = info.get("modes", [])
+        tags = info.get("tags", [])
+
+        left = QtWidgets.QVBoxLayout()
+        left.setSpacing(1)
+
+        name_lbl = QtWidgets.QLabel(f"<b>{name}</b>")
+        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 12px;")
+        left.addWidget(name_lbl)
+
+        if desc:
+            desc_lbl = QtWidgets.QLabel(desc)
+            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 10px;")
+            desc_lbl.setWordWrap(True)
+            left.addWidget(desc_lbl)
+
+        if modes:
+            mode_str = ", ".join(modes)
+            mode_lbl = QtWidgets.QLabel(f"modes: {mode_str}")
+            mode_lbl.setStyleSheet("color: #6e6454; background: transparent; font-size: 9px;")
+            left.addWidget(mode_lbl)
+
+        h.addLayout(left, 1)
+
+        # 启用/禁用开关
+        toggle = QtWidgets.QCheckBox()
+        toggle.setChecked(enabled)
+        toggle.setToolTip(tr('plugin.tool_toggle_tip'))
+        toggle.stateChanged.connect(
+            lambda state, n=name: self._on_tool_toggle(n, state == QtCore.Qt.Checked))
+        h.addWidget(toggle)
+
+        return row
+
+    def _on_tool_toggle(self, tool_name: str, enabled: bool):
+        """启用/禁用工具"""
+        try:
+            from ..utils.tool_registry import get_tool_registry
+            reg = get_tool_registry()
+            reg.set_enabled(tool_name, enabled)
+            reg.save_disabled_to_config()
+        except Exception as e:
+            print(f"[PluginManager] Tool toggle error: {e}")
+
+    # ---------- Skills Tab ----------
+
+    def _refresh_skills_list(self):
+        """刷新 Skill 列表"""
+        while self._skills_layout.count():
+            item = self._skills_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        try:
+            from ..skills import list_skills
+            skills = list_skills()
+        except Exception as e:
+            lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
+            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
+            self._skills_layout.addWidget(lbl)
+            self._skills_layout.addStretch()
+            return
+
+        if not skills:
+            lbl = QtWidgets.QLabel(tr('plugin.no_skills'))
+            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            self._skills_layout.addWidget(lbl)
+        else:
+            for s in skills:
+                row = self._create_skill_row(s)
+                self._skills_layout.addWidget(row)
+
+        self._skills_layout.addStretch()
+
+        # 加载用户 Skill 目录
+        try:
+            from ..skills import _get_user_skill_dir
+            user_dir = _get_user_skill_dir()
+            if user_dir:
+                self._skill_dir_edit.setText(str(user_dir))
+        except Exception:
+            pass
+
+    def _create_skill_row(self, info: dict) -> QtWidgets.QWidget:
+        """创建单个 Skill 行"""
+        row = QtWidgets.QFrame()
+        row.setObjectName("pluginRow")
+
+        h = QtWidgets.QHBoxLayout(row)
+        h.setContentsMargins(10, 6, 10, 6)
+        h.setSpacing(8)
+
+        left = QtWidgets.QVBoxLayout()
+        left.setSpacing(2)
+
+        name = info.get("name", "Unknown")
+        name_lbl = QtWidgets.QLabel(f"<b>🧠 {name}</b>")
+        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 12px;")
+        left.addWidget(name_lbl)
+
+        desc = info.get("description", "")
+        if desc:
+            desc_lbl = QtWidgets.QLabel(desc[:120])
+            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 10px;")
+            desc_lbl.setWordWrap(True)
+            left.addWidget(desc_lbl)
+
+        params = info.get("parameters", {})
+        if params:
+            param_str = ", ".join(params.keys())
+            param_lbl = QtWidgets.QLabel(f"params: {param_str}")
+            param_lbl.setStyleSheet("color: #6e6454; background: transparent; font-size: 9px;")
+            left.addWidget(param_lbl)
+
+        h.addLayout(left, 1)
+
+        # Skill 启用/禁用开关
+        tool_name = f"skill:{name}"
+        enabled = True
+        try:
+            from ..utils.tool_registry import get_tool_registry
+            enabled = get_tool_registry().is_enabled(tool_name)
+        except Exception:
+            pass
+
+        toggle = QtWidgets.QCheckBox()
+        toggle.setChecked(enabled)
+        toggle.setToolTip(tr('plugin.tool_toggle_tip'))
+        toggle.stateChanged.connect(
+            lambda state, n=tool_name: self._on_tool_toggle(n, state == QtCore.Qt.Checked))
+        h.addWidget(toggle)
+
+        return row
+
+    def _browse_skill_dir(self):
+        """浏览选择用户 Skill 目录"""
+        dir_path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, tr('plugin.skill_dir_browse'), "")
+        if dir_path:
+            self._skill_dir_edit.setText(dir_path)
+            # 保存到 config/houdini_ai.ini
+            try:
+                import configparser
+                from pathlib import Path
+                config_dir = Path(__file__).resolve().parent.parent.parent / "config"
+                ini_path = config_dir / "houdini_ai.ini"
+                cfg = configparser.ConfigParser()
+                if ini_path.exists():
+                    cfg.read(str(ini_path), encoding='utf-8')
+                if not cfg.has_section("skills"):
+                    cfg.add_section("skills")
+                cfg.set("skills", "user_skill_dir", dir_path)
+                with open(ini_path, 'w', encoding='utf-8') as f:
+                    cfg.write(f)
+                print(f"[Skills] 用户 Skill 目录已设置: {dir_path}")
+            except Exception as e:
+                print(f"[Skills] 保存 Skill 目录失败: {e}")
 
     def _open_settings(self, plugin_name: str, info: dict):
         """打开插件设置对话框"""

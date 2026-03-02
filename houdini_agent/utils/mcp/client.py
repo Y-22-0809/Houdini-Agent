@@ -3405,7 +3405,7 @@ class HoudiniMCP:
         
         handler_name = self._TOOL_DISPATCH.get(tool_name)
         
-        # ★ 如果内部分派表中不存在，尝试外部插件注册的工具
+        # ★ 如果内部分派表中不存在，尝试外部工具（HookManager + ToolRegistry）
         if handler_name is None:
             try:
                 from ..hooks import get_hook_manager as _ghm
@@ -3418,6 +3418,24 @@ class HoudiniMCP:
                     except Exception:
                         pass
                     return result
+            except Exception:
+                pass
+            # ★ 尝试 ToolRegistry（Skill 工具以 skill: 前缀注册）
+            try:
+                from ..tool_registry import get_tool_registry
+                _reg = get_tool_registry()
+                if _reg.has_tool(tool_name):
+                    _handler = _reg.get_handler(tool_name)
+                    if _handler:
+                        result = _handler(arguments)
+                        if not isinstance(result, dict):
+                            result = {"success": True, "result": str(result)}
+                        try:
+                            _ghm_inst = _ghm()
+                            _ghm_inst.fire('on_after_tool', tool_name=tool_name, args=arguments, result=result)
+                        except Exception:
+                            pass
+                        return result
             except Exception:
                 pass
             return self._tool_unknown(tool_name)

@@ -8,13 +8,15 @@
 插件约定:
   1. PLUGIN_INFO dict — 插件元数据
   2. register(ctx) 函数 — 入口，ctx 是 PluginContext 实例
+
+★ 也支持装饰器 API (@hook / @tool / @ui_button)，详见下方示例。
 """
 
 PLUGIN_INFO = {
     "name": "Example Plugin",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "Houdini Agent Community",
-    "description": "Demonstrates all plugin capabilities: hooks, tools, buttons, settings",
+    "description": "Demonstrates all plugin capabilities: hooks, tools, buttons, settings, decorators",
     "settings": [
         {
             "key": "log_level",
@@ -39,17 +41,50 @@ PLUGIN_INFO = {
 }
 
 
+# ─────────────────────────────────────────────
+# 装饰器 API 示例（可选用法 — 在 register 之外也能注册）
+#
+# 装饰器在 register() 调用后自动应用到 ctx。
+# 注意：装饰器 API 是全局收集器，每个插件加载前会自动清空，
+#       因此不会与其他插件冲突。
+# ─────────────────────────────────────────────
+
+# from houdini_agent.utils.hooks import hook, tool, ui_button
+#
+# @hook("on_content_chunk")
+# def on_content(content, iteration=0):
+#     """实时监听 AI 输出的每个文本块"""
+#     pass  # 可以做字数统计、内容过滤等
+#
+# @tool(name="decorator_example", description="Decorator-registered tool")
+# def decorator_tool(args):
+#     return {"success": True, "result": "From decorator!"}
+#
+# @ui_button(icon="🎯", tooltip="Decorator Button")
+# def on_btn():
+#     print("Decorator button clicked!")
+
+
 def register(ctx):
     """插件入口 — ctx 是 PluginContext 实例
 
     可用 API:
-      ctx.on(event, callback)          — 注册事件钩子
-      ctx.register_tool(...)           — 注册自定义工具（AI 可调用）
-      ctx.register_button(icon, ...)   — 注册工具栏按钮
-      ctx.insert_chat_card(widget)     — 在聊天区域插入自定义 QWidget
-      ctx.get_setting(key)             — 读取插件设置
-      ctx.set_setting(key, value)      — 写入插件设置
-      ctx.log(msg)                     — 输出日志
+      ctx.on(event, callback, priority=100)  — 注册事件钩子
+      ctx.register_tool(...)                 — 注册自定义工具（AI 可调用）
+      ctx.register_button(icon, ...)         — 注册工具栏按钮
+      ctx.insert_chat_card(widget)           — 在聊天区域插入自定义 QWidget
+      ctx.get_setting(key)                   — 读取插件设置
+      ctx.set_setting(key, value)            — 写入插件设置
+      ctx.log(msg)                           — 输出日志
+
+    可用事件:
+      on_before_request   — (messages) → messages  (管道式过滤)
+      on_after_response   — (result, model, provider)
+      on_before_tool      — (tool_name, args)
+      on_after_tool       — (tool_name, args, result)
+      on_content_chunk    — (content, iteration)
+      on_session_start    — (session_id)
+      on_session_end      — (session_id)
     """
 
     # ─────────────────────────────────────────────
@@ -57,7 +92,7 @@ def register(ctx):
     # ─────────────────────────────────────────────
     log_level = ctx.get_setting("log_level", "info")
 
-    def on_tool_done(tool_name, args, result):
+    def on_tool_done(tool_name, args, result, **kwargs):
         if log_level == "debug":
             ctx.log(f"Tool {tool_name}({args}) -> {result}")
         else:
@@ -67,6 +102,7 @@ def register(ctx):
 
     # ─────────────────────────────────────────────
     # 2. 注册自定义工具 — AI 可以调用此工具
+    #    工具会自动注册到 ToolRegistry，在所有模式下可用
     # ─────────────────────────────────────────────
     if ctx.get_setting("enable_greeting", True):
         prefix = ctx.get_setting("greeting_prefix", "Hello")
@@ -108,8 +144,9 @@ def register(ctx):
 
     # ─────────────────────────────────────────────
     # 4. 管道式过滤 prompt（on_before_request）
+    #    注意回调签名支持 (messages) 或 (messages, **kwargs)
     # ─────────────────────────────────────────────
-    def add_custom_instruction(messages):
+    def add_custom_instruction(messages, **kwargs):
         """在 system prompt 末尾追加自定义指令"""
         if messages and messages[0].get("role") == "system":
             messages[0]["content"] += (
@@ -123,9 +160,9 @@ def register(ctx):
     # ─────────────────────────────────────────────
     # 5. 会话开始/结束 钩子
     # ─────────────────────────────────────────────
-    ctx.on("on_session_start", lambda session_id:
+    ctx.on("on_session_start", lambda session_id, **kw:
            ctx.log(f"Session started: {session_id}"))
-    ctx.on("on_session_end", lambda session_id:
+    ctx.on("on_session_end", lambda session_id, **kw:
            ctx.log(f"Session ended: {session_id}"))
 
     ctx.log("Example Plugin registered successfully!")

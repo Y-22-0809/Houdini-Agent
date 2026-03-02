@@ -350,6 +350,9 @@ class AITab(
             # 设置按钮容器引用
             if hasattr(self, '_plugin_button_container'):
                 bridge.set_button_container(self._plugin_button_container)
+            # 设置聊天区域布局（供 insert_chat_card 使用）
+            if hasattr(self, 'chat_layout') and self.chat_layout:
+                bridge.set_chat_layout(self.chat_layout)
             bridge.set_ai_tab(self)
             manager.set_ui_bridge(bridge)
 
@@ -1946,19 +1949,39 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         """
         # ★ Ask 模式安全守卫：拦截任何不在白名单的工具
         if not self._agent_mode and not self._plan_mode and tool_name not in self._ASK_MODE_TOOLS:
-            return {
-                "success": False,
-                "error": tr('ask.restricted', tool_name)
-            }
+            # 额外检查 ToolRegistry（插件/Skill 工具可能注册了 ask 模式）
+            _ask_allowed = False
+            try:
+                from ..utils.tool_registry import get_tool_registry
+                _meta = get_tool_registry()._tools.get(tool_name)
+                if _meta and _meta.enabled and "ask" in _meta.modes:
+                    _ask_allowed = True
+            except Exception:
+                pass
+            if not _ask_allowed:
+                return {
+                    "success": False,
+                    "error": tr('ask.restricted', tool_name)
+                }
         
         # ★ Plan 规划阶段安全守卫
         if self._plan_mode and self._plan_phase == 'planning':
             allowed = self._PLAN_PLANNING_TOOLS | {'create_plan'}
             if tool_name not in allowed:
-                return {
-                    "success": False,
-                    "error": f"Plan 规划阶段不允许执行 {tool_name}，只能使用查询工具和 create_plan"
-                }
+                # 额外检查 ToolRegistry（插件/Skill 工具可能注册了 plan_planning 模式）
+                _plan_allowed = False
+                try:
+                    from ..utils.tool_registry import get_tool_registry
+                    _meta = get_tool_registry()._tools.get(tool_name)
+                    if _meta and _meta.enabled and "plan_planning" in _meta.modes:
+                        _plan_allowed = True
+                except Exception:
+                    pass
+                if not _plan_allowed:
+                    return {
+                        "success": False,
+                        "error": f"Plan 规划阶段不允许执行 {tool_name}，只能使用查询工具和 create_plan"
+                    }
         
         # ★ 确认模式：对关键节点操作弹出预览确认
         if self._confirm_mode and tool_name in self._CONFIRM_TOOLS:
@@ -3550,6 +3573,26 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                     filtered = [t for t in HOUDINI_TOOLS if t['function']['name'] not in ('web_search', 'fetch_webpage')]
                     self._cached_optimized_tools_no_web = UltraOptimizer.optimize_tool_definitions(filtered)
                 tools = self._cached_optimized_tools_no_web
+            
+            # ★ 合并外部工具（HookManager 插件工具 + ToolRegistry Skill 工具）
+            try:
+                from ..utils.hooks import get_hook_manager as _ghm_tools
+                _ext = _ghm_tools().get_external_tools()
+                if _ext:
+                    tools = list(tools) + _ext
+            except Exception:
+                pass
+            try:
+                from ..utils.tool_registry import get_tool_registry
+                _reg = get_tool_registry()
+                # 获取 ToolRegistry 中 source=skill 的工具（避免与上面重复）
+                _existing_names = {t.get('function', {}).get('name', '') for t in tools}
+                for meta in _reg._tools.values():
+                    if meta.source == "skill" and meta.enabled and meta.name not in _existing_names:
+                        tools = list(tools) if not isinstance(tools, list) else tools
+                        tools.append(meta.schema)
+            except Exception:
+                pass
             
             # ★ Plan 模式的静默工具集合（不在 UI 中显示的工具）
             _silent = self._SILENT_TOOLS | self._PLAN_SILENT_TOOLS if plan_mode else self._SILENT_TOOLS

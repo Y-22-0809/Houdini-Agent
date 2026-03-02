@@ -1300,6 +1300,15 @@ HOUDINI_TOOLS = [
     }
 ]
 
+# ★ 将核心工具注册到 ToolRegistry（模块加载时自动执行）
+try:
+    from .tool_registry import get_tool_registry as _get_reg
+    _reg = _get_reg()
+    if not _reg.initialized:
+        _reg.register_core_tools(HOUDINI_TOOLS)
+except Exception as _e:
+    print(f"[AIClient] ToolRegistry 注册失败 (非致命): {_e}")
+
 
 # ============================================================
 # AI 客户端
@@ -3140,17 +3149,9 @@ class AIClient:
         iteration = 0
         
         # ★ 工具列表：支持外部覆盖（用于 Ask 模式等场景）
+        # 注意：外部插件工具已在 ai_tab._run_agent 中合并到 tools_override，
+        # 此处不再重复合并，避免工具重复。
         effective_tools = tools_override if tools_override is not None else HOUDINI_TOOLS
-        
-        # ★ Hook: 合并外部插件注册的工具
-        try:
-            from .hooks import get_hook_manager as _ghm
-            _hm = _ghm()
-            _ext_tools = _hm.get_external_tools()
-            if _ext_tools:
-                effective_tools = list(effective_tools) + _ext_tools
-        except Exception:
-            pass
         
         # 累积 usage 统计（用于 cache 命中率统计）
         total_usage = {
@@ -4039,17 +4040,9 @@ class AIClient:
             return {'ok': False, 'error': '未设置工具执行器', 'content': '', 'tool_calls_history': [], 'iterations': 0}
         
         # ★ 工具列表：支持外部覆盖（用于 Ask 模式等场景）
+        # 注意：外部插件工具已在 ai_tab._run_agent 中合并到 tools_override，
+        # 此处不再重复合并，避免工具重复。
         effective_tools = tools_override if tools_override is not None else HOUDINI_TOOLS
-        
-        # ★ Hook: 合并外部插件注册的工具
-        try:
-            from .hooks import get_hook_manager as _ghm
-            _hm = _ghm()
-            _ext_tools = _hm.get_external_tools()
-            if _ext_tools:
-                effective_tools = list(effective_tools) + _ext_tools
-        except Exception:
-            pass
         
         # 添加 JSON 模式系统提示
         json_system_prompt = self._get_json_mode_system_prompt(effective_tools)

@@ -110,11 +110,24 @@ class HookManager:
             ]
 
     def unregister_all(self, plugin_name: str = ""):
-        """注销所有钩子（或指定插件的钩子）"""
+        """注销所有钩子（或指定插件的钩子）
+
+        .. deprecated::
+            按 plugin_name 注销请使用 PluginContext._cleanup()，
+            它会精确跟踪并清理该插件注册的所有钩子、工具和按钮。
+            此方法仅用于全局清理（plugin_name 为空时）。
+        """
         if not plugin_name:
             for event in self._hooks:
                 self._hooks[event] = []
-        # 按插件名注销需要在 PluginContext 中跟踪
+        else:
+            # ★ 通过 PluginContext._cleanup() 实现，此处仅做提示
+            import warnings
+            warnings.warn(
+                "unregister_all(plugin_name) is deprecated. "
+                "Use PluginContext._cleanup() instead.",
+                DeprecationWarning, stacklevel=2,
+            )
 
     # ---------- 事件触发 ----------
 
@@ -135,10 +148,15 @@ class HookManager:
 
         用于 on_before_request 等需要修改数据的场景。
         如果回调返回 None，保留原值。
+        回调签名可以是 callback(value) 或 callback(value, **kwargs)。
         """
         for _priority, callback in self._hooks.get(event, []):
             try:
-                result = callback(value, **kwargs)
+                try:
+                    result = callback(value, **kwargs)
+                except TypeError:
+                    # 降级：回调不接受额外 kwargs
+                    result = callback(value)
                 if result is not None:
                     value = result
             except Exception as e:
@@ -159,24 +177,45 @@ class HookManager:
             handler: 执行函数，签名 (args: dict) -> dict
             plugin_name: 所属插件名
         """
+        full_schema = {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": f"[Plugin] {description}",
+                "parameters": schema,
+            }
+        }
         self._external_tools[name] = {
-            "schema": {
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "description": f"[Plugin] {description}",
-                    "parameters": schema,
-                }
-            },
+            "schema": full_schema,
             "handler": handler,
             "plugin": plugin_name,
         }
+        # ★ 同步注册到 ToolRegistry
+        try:
+            from .tool_registry import get_tool_registry
+            get_tool_registry().register(
+                name=name,
+                schema=full_schema,
+                handler=handler,
+                source="plugin",
+                plugin_name=plugin_name,
+                tags=set(),
+                modes={"agent", "ask", "plan_executing"},
+            )
+        except Exception:
+            pass
         print(f"[Hook] 注册外部工具: {name} (from {plugin_name or 'unknown'})")
 
     def unregister_tool(self, name: str):
         """注销外部工具"""
         if name in self._external_tools:
             del self._external_tools[name]
+            # ★ 同步从 ToolRegistry 注销
+            try:
+                from .tool_registry import get_tool_registry
+                get_tool_registry().unregister(name)
+            except Exception:
+                pass
 
     def unregister_tools_by_plugin(self, plugin_name: str):
         """注销指定插件的所有工具"""
@@ -184,6 +223,12 @@ class HookManager:
                      if v.get("plugin") == plugin_name]
         for n in to_remove:
             del self._external_tools[n]
+        # ★ 同步从 ToolRegistry 注销
+        try:
+            from .tool_registry import get_tool_registry
+            get_tool_registry().unregister_by_source("plugin", plugin_name)
+        except Exception:
+            pass
 
     def get_external_tools(self) -> List[dict]:
         """获取所有外部工具的 OpenAI schema 列表"""
@@ -289,6 +334,14 @@ class PluginUIBridge:
             from houdini_agent.qt_compat import QtWidgets, QtCore
         except ImportError:
             return
+
+        # ★ 先清空旧按钮，防止重复挂载
+        while self._button_container.count():
+            item = self._button_container.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
 
         for plugin_name, icon, tooltip, callback in manager.get_buttons():
             btn = QtWidgets.QPushButton(icon)
@@ -462,11 +515,27 @@ def load_all_plugins():
         print(f"[Hook] 已加载 {len(_loaded_plugins)} 个插件, "
               f"启用 {len(enabled)} 个: {', '.join(enabled) or '(无)'}")
 
+    # ★ 从配置加载禁用工具列表到 ToolRegistry
+    try:
+        disabled_tools = config.get("disabled_tools", [])
+        if disabled_tools:
+            from .tool_registry import get_tool_registry
+            get_tool_registry().load_disabled_from_config(disabled_tools)
+            print(f"[Hook] 已禁用 {len(disabled_tools)} 个工具: {', '.join(disabled_tools)}")
+    except Exception:
+        pass
+
 
 def _load_single_plugin(filepath: Path, module_name: str,
                          disabled_list: List[str],
                          manager: HookManager):
     """加载单个插件"""
+    # ★ 清空装饰器收集器，防止多插件之间串扰
+    global _pending_hooks, _pending_tools, _pending_buttons
+    _pending_hooks = []
+    _pending_tools = []
+    _pending_buttons = []
+
     spec = importlib.util.spec_from_file_location(
         f"houdini_plugins.{module_name}", str(filepath))
     mod = importlib.util.module_from_spec(spec)
@@ -515,6 +584,8 @@ def _load_single_plugin(filepath: Path, module_name: str,
     if is_enabled:
         try:
             register_fn(ctx)
+            # ★ 应用装饰器收集的钩子/工具/按钮
+            _apply_decorators(ctx)
             print(f"[Hook] ✔ 插件 {plugin_name} v{info.get('version', '?')} 已加载")
         except Exception as e:
             print(f"[Hook] ✖ 插件 {plugin_name} register() 失败: {e}")
