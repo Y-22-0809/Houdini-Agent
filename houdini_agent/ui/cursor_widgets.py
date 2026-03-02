@@ -6493,13 +6493,12 @@ class PluginManagerDialog(QtWidgets.QDialog):
         # 标题
         title = QtWidgets.QLabel(tr('plugin.manager_title'))
         title.setObjectName("pluginManagerTitle")
-        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #e2e8f0; background: transparent;")
         layout.addWidget(title)
 
         # 分隔线
         sep = QtWidgets.QFrame()
         sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setStyleSheet("color: rgba(255,255,255,8);")
+        sep.setStyleSheet("color: rgba(180,160,130,12);")
         layout.addWidget(sep)
 
         # 插件列表滚动区域
@@ -6551,14 +6550,14 @@ class PluginManagerDialog(QtWidgets.QDialog):
             plugins = list_plugins()
         except Exception as e:
             lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
-            lbl.setStyleSheet("color: #f87171; padding: 12px; background: transparent;")
+            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
             self._list_layout.addWidget(lbl)
             self._list_layout.addStretch()
             return
 
         if not plugins:
             lbl = QtWidgets.QLabel(tr('plugin.no_plugins'))
-            lbl.setStyleSheet("color: #94a3b8; padding: 20px; background: transparent;")
+            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
             lbl.setAlignment(QtCore.Qt.AlignCenter)
             self._list_layout.addWidget(lbl)
         else:
@@ -6586,8 +6585,8 @@ class PluginManagerDialog(QtWidgets.QDialog):
         author = info.get("author", "")
         enabled = info.get("_enabled", False)
 
-        name_lbl = QtWidgets.QLabel(f"<b>{name}</b>  <span style='color:#64748b'>v{version}</span>")
-        name_lbl.setStyleSheet("color: #e2e8f0; background: transparent; font-size: 13px;")
+        name_lbl = QtWidgets.QLabel(f"<b>{name}</b>  <span style='color:#8a7e6e'>v{version}</span>")
+        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 13px;")
         left.addWidget(name_lbl)
 
         desc = info.get("description", "")
@@ -6595,7 +6594,7 @@ class PluginManagerDialog(QtWidgets.QDialog):
             desc = f"by {author}  •  {desc}" if desc else f"by {author}"
         if desc:
             desc_lbl = QtWidgets.QLabel(desc)
-            desc_lbl.setStyleSheet("color: #94a3b8; background: transparent; font-size: 11px;")
+            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 11px;")
             desc_lbl.setWordWrap(True)
             left.addWidget(desc_lbl)
 
@@ -6668,12 +6667,13 @@ class PluginManagerDialog(QtWidgets.QDialog):
         """打开 plugins 目录"""
         try:
             from ..utils.hooks import get_plugins_dir
-            import subprocess, sys
+            import os, subprocess
+            import sys as _sys
             plugins_dir = get_plugins_dir()
             plugins_dir.mkdir(parents=True, exist_ok=True)
-            if sys.platform == 'win32':
+            if _sys.platform == 'win32':
                 os.startfile(str(plugins_dir))
-            elif sys.platform == 'darwin':
+            elif _sys.platform == 'darwin':
                 subprocess.Popen(['open', str(plugins_dir)])
             else:
                 subprocess.Popen(['xdg-open', str(plugins_dir)])
@@ -6715,13 +6715,13 @@ class PluginSettingsPage(QtWidgets.QDialog):
 
         # 标题
         title = QtWidgets.QLabel(f"⚙ {plugin_name}")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #e2e8f0; background: transparent;")
+        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #d4c5b0; background: transparent;")
         layout.addWidget(title)
 
         # 分隔线
         sep = QtWidgets.QFrame()
         sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setStyleSheet("color: rgba(255,255,255,8);")
+        sep.setStyleSheet("color: rgba(180,160,130,12);")
         layout.addWidget(sep)
 
         # 读取当前设置值

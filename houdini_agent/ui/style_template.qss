@@ -2134,113 +2134,135 @@ QPushButton#updateNotifyDismiss:hover {
 
 
 /* ============================================================
-   PLUGIN MANAGER
+   PLUGIN MANAGER (warm khaki)
    ============================================================ */
 
 QDialog#pluginManagerDlg, QDialog#pluginSettingsDlg {
     background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1,
-                    stop:0 #0f1019, stop:0.5 #0d0f1a, stop:1 #0a1018);
-    border: 1px solid rgba(255,255,255,12);
+                    stop:0 #181510, stop:0.5 #14120e, stop:1 #100e0a);
+    border: 1px solid rgba(180,160,130,15);
     border-radius: 8px;
+    color: #d4c5b0;
 }
 QLabel#pluginManagerTitle {
     font-size: {FS_LG}px;
     font-weight: bold;
-    color: #e2e8f0;
+    color: #d4c5b0;
     background: transparent;
     padding: 4px 0;
 }
 QFrame#pluginRow {
-    background: rgba(16,18,32,200);
-    border: 1px solid rgba(255,255,255,8);
+    background: rgba(40,35,28,200);
+    border: 1px solid rgba(180,160,130,10);
     border-radius: 6px;
     padding: 6px 8px;
     margin: 2px 0;
 }
 QFrame#pluginRow:hover {
-    border: 1px solid rgba(255,255,255,16);
-    background: rgba(22,24,42,220);
+    border: 1px solid rgba(212,165,116,30);
+    background: rgba(50,44,35,220);
 }
 QPushButton#pluginBtn {
     font-size: {FS_XS}px;
     padding: 4px 12px;
     border-radius: 4px;
-    background: rgba(255,255,255,8);
-    color: #94a3b8;
-    border: 1px solid rgba(255,255,255,12);
+    background: rgba(45,40,32,200);
+    color: #b0a08c;
+    border: 1px solid rgba(180,160,130,18);
 }
 QPushButton#pluginBtn:hover {
-    background: rgba(255,255,255,14);
-    color: #e2e8f0;
+    background: rgba(55,48,38,230);
+    color: #d4c5b0;
+    border-color: rgba(212,165,116,40);
 }
 QPushButton#pluginBtnPrimary {
     font-size: {FS_XS}px;
     font-weight: bold;
     padding: 4px 14px;
     border-radius: 4px;
-    background: rgba(59,130,246,160);
-    color: #ffffff;
+    background: rgba(212,165,116,180);
+    color: #1a1a18;
     border: none;
 }
 QPushButton#pluginBtnPrimary:hover {
-    background: rgba(37,99,235,200);
+    background: rgba(212,165,116,220);
 }
 QPushButton#pluginBtnSmall {
     font-size: {FS_XS}px;
     border-radius: 4px;
-    background: rgba(255,255,255,6);
-    color: #94a3b8;
-    border: 1px solid rgba(255,255,255,8);
+    background: rgba(45,40,32,160);
+    color: #b0a08c;
+    border: 1px solid rgba(180,160,130,12);
 }
 QPushButton#pluginBtnSmall:hover {
-    background: rgba(255,255,255,12);
-    color: #e2e8f0;
+    background: rgba(55,48,38,220);
+    color: #d4c5b0;
+    border-color: rgba(212,165,116,40);
 }
 QPushButton#pluginToolbarBtn {
     font-size: {FS_SM}px;
     border-radius: 4px;
-    background: rgba(255,255,255,6);
-    color: #94a3b8;
-    border: 1px solid rgba(255,255,255,8);
+    background: rgba(45,40,32,160);
+    color: #b0a08c;
+    border: 1px solid rgba(180,160,130,12);
     padding: 2px;
 }
 QPushButton#pluginToolbarBtn:hover {
-    background: rgba(168,139,250,40);
-    color: #a78bfa;
-    border: 1px solid rgba(168,139,250,60);
+    background: rgba(212,165,116,25);
+    color: #d4a574;
+    border: 1px solid rgba(212,165,116,50);
+}
+/* Plugin row checkbox (enable/disable toggle) */
+QDialog#pluginManagerDlg QCheckBox {
+    spacing: 0px;
+}
+QDialog#pluginManagerDlg QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(180,160,130,30);
+    border-radius: 3px;
+    background: transparent;
+}
+QDialog#pluginManagerDlg QCheckBox::indicator:hover {
+    border-color: rgba(212,165,116,60);
+}
+QDialog#pluginManagerDlg QCheckBox::indicator:checked {
+    background: rgba(212,165,116,200);
+    border-color: #d4a574;
 }
 
 
 /* ============================================================
-   RULES EDITOR DIALOG
+   RULES EDITOR DIALOG (warm khaki)
    ============================================================ */
 
 QDialog#rulesEditorDlg {
     background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1,
-                    stop:0 #0f1019, stop:0.5 #0d0f1a, stop:1 #0a1018);
-    border: 1px solid rgba(255,255,255,12);
+                    stop:0 #181510, stop:0.5 #14120e, stop:1 #100e0a);
+    border: 1px solid rgba(180,160,130,15);
     border-radius: 8px;
+    color: #d4c5b0;
 }
 QLabel#rulesEditorTitle {
     font-size: {FS_LG}px;
     font-weight: bold;
-    color: #e2e8f0;
+    color: #d4c5b0;
     background: transparent;
     padding: 4px 0;
 }
 QLabel#rulesCountLabel {
     font-size: {FS_XS}px;
-    color: #64748b;
+    color: #8a7e6e;
     background: transparent;
 }
 QListWidget#rulesList {
-    background: rgba(16,18,32,200);
-    border: 1px solid rgba(255,255,255,8);
+    background: rgba(30,26,20,200);
+    border: 1px solid rgba(180,160,130,12);
     border-radius: 6px;
     outline: none;
     padding: 4px;
     font-size: {FS_SM}px;
-    color: #e2e8f0;
+    color: #d4c5b0;
 }
 QListWidget#rulesList::item {
     padding: 6px 8px;
@@ -2248,65 +2270,136 @@ QListWidget#rulesList::item {
     margin: 1px 0;
 }
 QListWidget#rulesList::item:hover {
-    background: rgba(255,255,255,6);
+    background: rgba(180,160,130,8);
 }
 QListWidget#rulesList::item:selected {
-    background: rgba(59,130,246,30);
-    border: 1px solid rgba(59,130,246,50);
+    background: rgba(212,165,116,18);
+    border: 1px solid rgba(212,165,116,40);
+    color: #f0e6d6;
 }
 QLineEdit#rulesTitleEdit {
-    background: rgba(16,18,32,200);
-    border: 1px solid rgba(255,255,255,10);
+    background: rgba(30,26,20,200);
+    border: 1px solid rgba(180,160,130,12);
     border-radius: 5px;
     padding: 6px 8px;
-    color: #e2e8f0;
+    color: #d4c5b0;
     font-size: {FS_MD}px;
     font-weight: bold;
 }
 QLineEdit#rulesTitleEdit:focus {
-    border: 1px solid rgba(59,130,246,80);
+    border: 1px solid rgba(212,165,116,60);
+    background: rgba(35,30,24,230);
 }
 QLineEdit#rulesTitleEdit[readOnly="true"] {
-    background: rgba(16,18,32,120);
-    color: #94a3b8;
+    background: rgba(30,26,20,120);
+    color: #8a7e6e;
 }
 QPlainTextEdit#rulesContentEdit {
-    background: rgba(16,18,32,200);
-    border: 1px solid rgba(255,255,255,10);
+    background: rgba(30,26,20,200);
+    border: 1px solid rgba(180,160,130,12);
     border-radius: 5px;
     padding: 8px;
-    color: #e2e8f0;
+    color: #d4c5b0;
     font-size: {FS_SM}px;
-    font-family: "Consolas", "Courier New", monospace;
-    selection-background-color: rgba(59,130,246,60);
+    font-family: 'Microsoft YaHei', 'SimSun', 'Consolas', monospace;
+    selection-background-color: rgba(212,165,116,40);
+    selection-color: #f0e6d6;
 }
 QPlainTextEdit#rulesContentEdit:focus {
-    border: 1px solid rgba(59,130,246,80);
+    border: 1px solid rgba(212,165,116,60);
+    background: rgba(35,30,24,230);
 }
 QPlainTextEdit#rulesContentEdit[readOnly="true"] {
-    background: rgba(16,18,32,120);
-    color: #94a3b8;
+    background: rgba(30,26,20,120);
+    color: #8a7e6e;
 }
 QLabel#rulesSourceLabel {
     font-size: {FS_XS}px;
-    color: #64748b;
+    color: #8a7e6e;
     background: transparent;
     padding: 2px 0;
 }
 QLabel#rulesEmptyHint {
-    color: #475569;
+    color: #8a7e6e;
     font-size: {FS_SM}px;
     background: transparent;
     padding: 20px;
 }
 QSplitter#rulesSplitter::handle {
-    background: rgba(255,255,255,6);
+    background: rgba(180,160,130,10);
     width: 2px;
     margin: 4px 6px;
     border-radius: 1px;
 }
 QSplitter#rulesSplitter::handle:hover {
-    background: rgba(59,130,246,40);
+    background: rgba(212,165,116,40);
+}
+
+
+/* ============================================================
+   PLUGIN SETTINGS FORM CONTROLS (warm khaki)
+   ============================================================ */
+
+QDialog#pluginSettingsDlg QLabel {
+    color: #d4c5b0;
+    background: transparent;
+}
+QDialog#pluginSettingsDlg QLineEdit {
+    background: rgba(30,26,20,200);
+    border: 1px solid rgba(180,160,130,12);
+    border-radius: 4px;
+    padding: 4px 6px;
+    color: #d4c5b0;
+    font-size: {FS_SM}px;
+}
+QDialog#pluginSettingsDlg QLineEdit:focus {
+    border-color: rgba(212,165,116,60);
+    background: rgba(35,30,24,230);
+}
+QDialog#pluginSettingsDlg QComboBox {
+    background: rgba(45,40,32,200);
+    color: #d4c5b0;
+    border: 1px solid rgba(180,160,130,18);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: {FS_SM}px;
+}
+QDialog#pluginSettingsDlg QComboBox::drop-down {
+    border: none;
+    width: 14px;
+}
+QDialog#pluginSettingsDlg QComboBox:hover {
+    border-color: rgba(212,165,116,50);
+    background: rgba(50,44,35,230);
+}
+QDialog#pluginSettingsDlg QComboBox QAbstractItemView {
+    background: rgba(35,30,24,248);
+    color: #d4c5b0;
+    border: 1px solid rgba(180,160,130,20);
+    selection-background-color: rgba(212,165,116,40);
+    selection-color: #f0e6d6;
+    font-size: {FS_SM}px;
+    outline: none;
+    border-radius: 4px;
+}
+QDialog#pluginSettingsDlg QCheckBox {
+    color: #d4c5b0;
+    font-size: {FS_SM}px;
+    spacing: 5px;
+}
+QDialog#pluginSettingsDlg QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(180,160,130,30);
+    border-radius: 3px;
+    background: transparent;
+}
+QDialog#pluginSettingsDlg QCheckBox::indicator:hover {
+    border-color: rgba(212,165,116,60);
+}
+QDialog#pluginSettingsDlg QCheckBox::indicator:checked {
+    background: rgba(212,165,116,200);
+    border-color: #d4a574;
 }
 
 
