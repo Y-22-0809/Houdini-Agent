@@ -308,6 +308,7 @@ class ToolRegistry:
             'check_errors', 'read_selection', 'get_node_inputs',
             'get_node_positions', 'list_network_boxes',
             'verify_and_summarize',
+            'search_memory',
         },
         'create': {
             'create_node', 'create_nodes_batch', 'create_wrangle_node',
@@ -323,6 +324,7 @@ class ToolRegistry:
             'web_search', 'fetch_webpage', 'search_local_doc',
             'search_node_types', 'semantic_search_nodes',
             'find_nodes_by_param', 'get_houdini_node_doc',
+            'search_memory',
         },
         'layout': {
             'layout_nodes', 'create_network_box',
@@ -353,7 +355,9 @@ class ToolRegistry:
         'code': ['python', 'script', 'code', 'run', 'execute', 'vex', 'wrangle',
                  '脚本', '代码', '运行', '执行'],
         'search': ['search', 'find', 'where', 'document', 'doc', 'web', 'online',
-                   '搜索', '查找', '文档', '网上', '在线'],
+                   'memory', 'remember', 'recall',
+                   '搜索', '查找', '文档', '网上', '在线',
+                   '记忆', '记住', '回忆', '偏好', '历史'],
         'layout': ['layout', 'organize', 'arrange', 'position', 'move',
                    '排列', '布局', '整理', '位置'],
         'perf': ['performance', 'profile', 'benchmark', 'speed', 'slow',

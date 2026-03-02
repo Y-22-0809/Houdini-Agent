@@ -5441,9 +5441,7 @@ class NodeCompleterPopup(QtWidgets.QListWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # ★ 不在构造时设置 ToolTip 窗口标志（会创建原生窗口句柄导致闪烁）
-        # 改为在 show_filtered 中首次显示时再设置
-        self._flags_applied = False
+        self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint)
         self.setFixedWidth(320)
         self.setMaximumHeight(200)
         self.setObjectName("nodeCompleter")
@@ -5457,10 +5455,6 @@ class NodeCompleterPopup(QtWidgets.QListWidget):
 
     def show_filtered(self, prefix: str, anchor_widget: QtWidgets.QWidget, cursor_rect):
         """根据前缀过滤并显示"""
-        # ★ 首次显示时才设置窗口标志，避免构造时创建原生 tooltip 窗口导致闪烁
-        if not self._flags_applied:
-            self._flags_applied = True
-            self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint)
         self.clear()
         lower_prefix = prefix.lower()
         matches = [p for p in self._all_paths if lower_prefix in p.lower()][:30]

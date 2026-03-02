@@ -256,20 +256,25 @@ class InputAreaMixin:
 
     def _collect_node_paths(self) -> list:
         """收集当前场景中的节点路径列表（用于 @ 补全）"""
+        paths = []
         try:
             import hou  # type: ignore
-            paths = []
             for ctx in ['/obj', '/out', '/shop', '/mat', '/stage']:
                 try:
                     node = hou.node(ctx)
                     if node:
+                        # 先添加上下文根节点本身
+                        paths.append(ctx)
                         for child in node.allSubChildren():
                             paths.append(child.path())
                 except Exception:
                     continue
-            return paths
         except ImportError:
-            return []
+            pass
+        # ★ 如果场景中完全没有节点，至少提供上下文根路径
+        if not paths:
+            paths = ['/obj', '/out', '/shop', '/mat', '/stage']
+        return paths
 
     # ---------- / 斜杠命令自动补全 ----------
 
