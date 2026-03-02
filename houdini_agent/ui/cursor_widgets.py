@@ -6914,138 +6914,177 @@ class PluginSettingsPage(QtWidgets.QDialog):
 class RulesEditorDialog(QtWidgets.QDialog):
     """用户自定义规则编辑器对话框
 
-    左侧：规则列表（UI 规则 + 文件规则）
-    右侧：标题 + 内容编辑区
-    底部工具栏：新增 / 删除 / 启用禁用 / 打开目录
+    左侧：规则列表 + 操作按钮
+    右侧：标题 + 内容编辑区（或空状态引导）
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("rulesEditorDlg")
         self.setWindowTitle(tr('rules.title'))
-        self.setMinimumSize(680, 480)
-        self.resize(750, 520)
+        self.setMinimumSize(580, 400)
+        self.resize(640, 440)
         self._current_rule_id: Optional[str] = None
-        self._rules: list = []             # 所有规则的工作副本
-        self._dirty = False                # 是否有未保存的修改
+        self._rules: list = []
+        self._dirty = False
 
         self._build_ui()
         self._load_rules()
 
     def _build_ui(self):
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(16, 12, 16, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # ---- 标题行 ----
-        title_row = QtWidgets.QHBoxLayout()
-        title_lbl = QtWidgets.QLabel(tr('rules.title'))
+        # ---- 标题栏 ----
+        header = QtWidgets.QFrame()
+        header.setObjectName("rulesHeader")
+        header.setFixedHeight(40)
+        header_layout = QtWidgets.QHBoxLayout(header)
+        header_layout.setContentsMargins(14, 0, 14, 0)
+        header_layout.setSpacing(8)
+
+        title_lbl = QtWidgets.QLabel(f"📋  {tr('rules.title')}")
         title_lbl.setObjectName("rulesEditorTitle")
-        title_row.addWidget(title_lbl)
-        title_row.addStretch()
+        header_layout.addWidget(title_lbl)
+        header_layout.addStretch()
 
-        # 规则计数
         self._count_label = QtWidgets.QLabel("")
         self._count_label.setObjectName("rulesCountLabel")
-        title_row.addWidget(self._count_label)
-        root.addLayout(title_row)
+        header_layout.addWidget(self._count_label)
 
-        # ---- 主体：左列表 + 右编辑区 ----
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        splitter.setObjectName("rulesSplitter")
+        root.addWidget(header)
 
-        # -- 左侧：规则列表 --
-        left = QtWidgets.QWidget()
-        left_layout = QtWidgets.QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(4)
+        # ---- 主体 ----
+        body = QtWidgets.QHBoxLayout()
+        body.setContentsMargins(10, 8, 10, 0)
+        body.setSpacing(8)
+
+        # ── 左侧面板 ──
+        left_panel = QtWidgets.QFrame()
+        left_panel.setObjectName("rulesLeftPanel")
+        left_panel.setFixedWidth(200)
+        left_v = QtWidgets.QVBoxLayout(left_panel)
+        left_v.setContentsMargins(0, 0, 0, 0)
+        left_v.setSpacing(6)
 
         self._list_widget = QtWidgets.QListWidget()
         self._list_widget.setObjectName("rulesList")
-        self._list_widget.setMinimumWidth(180)
         self._list_widget.currentRowChanged.connect(self._on_rule_selected)
-        left_layout.addWidget(self._list_widget)
+        left_v.addWidget(self._list_widget, 1)
 
-        # 左侧按钮行
+        # 操作按钮
         btn_row = QtWidgets.QHBoxLayout()
         btn_row.setSpacing(4)
 
-        self._btn_add = QtWidgets.QPushButton(tr('rules.add'))
-        self._btn_add.setObjectName("pluginBtnPrimary")
+        self._btn_add = QtWidgets.QPushButton(f"＋ {tr('rules.add')}")
+        self._btn_add.setObjectName("rulesAddBtn")
         self._btn_add.setCursor(QtCore.Qt.PointingHandCursor)
         self._btn_add.clicked.connect(self._on_add)
         btn_row.addWidget(self._btn_add)
 
-        self._btn_delete = QtWidgets.QPushButton(tr('rules.delete'))
-        self._btn_delete.setObjectName("pluginBtn")
+        self._btn_delete = QtWidgets.QPushButton("✕")
+        self._btn_delete.setObjectName("rulesDelBtn")
+        self._btn_delete.setFixedWidth(28)
         self._btn_delete.setCursor(QtCore.Qt.PointingHandCursor)
+        self._btn_delete.setToolTip(tr('rules.delete'))
         self._btn_delete.clicked.connect(self._on_delete)
         btn_row.addWidget(self._btn_delete)
 
-        btn_row.addStretch()
+        left_v.addLayout(btn_row)
+        body.addWidget(left_panel)
 
-        self._btn_open_dir = QtWidgets.QPushButton(tr('rules.open_folder'))
-        self._btn_open_dir.setObjectName("pluginBtn")
-        self._btn_open_dir.setCursor(QtCore.Qt.PointingHandCursor)
-        self._btn_open_dir.clicked.connect(self._on_open_dir)
-        btn_row.addWidget(self._btn_open_dir)
+        # ── 右侧面板 (QStackedWidget: 空状态 / 编辑区) ──
+        self._right_stack = QtWidgets.QStackedWidget()
+        self._right_stack.setObjectName("rulesRightStack")
 
-        left_layout.addLayout(btn_row)
-        splitter.addWidget(left)
+        # page 0: 空状态引导
+        empty_page = QtWidgets.QWidget()
+        empty_lay = QtWidgets.QVBoxLayout(empty_page)
+        empty_lay.setAlignment(QtCore.Qt.AlignCenter)
 
-        # -- 右侧：编辑区 --
-        right = QtWidgets.QWidget()
-        right_layout = QtWidgets.QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(6)
+        empty_icon = QtWidgets.QLabel("📝")
+        empty_icon.setAlignment(QtCore.Qt.AlignCenter)
+        empty_icon.setStyleSheet("font-size: 32px; background: transparent;")
+        empty_lay.addWidget(empty_icon)
 
-        # 标题输入
-        self._title_edit = QtWidgets.QLineEdit()
-        self._title_edit.setObjectName("rulesTitleEdit")
-        self._title_edit.setPlaceholderText(tr('rules.placeholder_title'))
-        self._title_edit.textChanged.connect(self._on_title_changed)
-        right_layout.addWidget(self._title_edit)
-
-        # 内容编辑（多行）
-        self._content_edit = QtWidgets.QPlainTextEdit()
-        self._content_edit.setObjectName("rulesContentEdit")
-        self._content_edit.setPlaceholderText(tr('rules.placeholder_content'))
-        self._content_edit.textChanged.connect(self._on_content_changed)
-        right_layout.addWidget(self._content_edit)
-
-        # 来源/状态标签
-        self._source_label = QtWidgets.QLabel("")
-        self._source_label.setObjectName("rulesSourceLabel")
-        right_layout.addWidget(self._source_label)
-
-        # 启用/禁用 + 保存按钮
-        action_row = QtWidgets.QHBoxLayout()
-        self._btn_toggle = QtWidgets.QPushButton(tr('rules.disable'))
-        self._btn_toggle.setObjectName("pluginBtn")
-        self._btn_toggle.setCursor(QtCore.Qt.PointingHandCursor)
-        self._btn_toggle.clicked.connect(self._on_toggle_enabled)
-        action_row.addWidget(self._btn_toggle)
-        action_row.addStretch()
-        right_layout.addLayout(action_row)
-
-        splitter.addWidget(right)
-
-        # 设置分割比例
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
-        root.addWidget(splitter)
-
-        # ---- 空状态占位 ----
         self._empty_label = QtWidgets.QLabel(tr('rules.empty_hint'))
         self._empty_label.setObjectName("rulesEmptyHint")
         self._empty_label.setAlignment(QtCore.Qt.AlignCenter)
         self._empty_label.setWordWrap(True)
-        # 将 empty label 作为 right 的覆盖层
-        self._empty_label.setParent(right)
-        self._empty_label.setGeometry(right.rect())
+        empty_lay.addWidget(self._empty_label)
 
-        # 初始禁用右侧
-        self._set_editor_enabled(False)
+        # 空状态下的新建按钮
+        empty_add_btn = QtWidgets.QPushButton(f"＋ {tr('rules.add')}")
+        empty_add_btn.setObjectName("rulesAddBtn")
+        empty_add_btn.setCursor(QtCore.Qt.PointingHandCursor)
+        empty_add_btn.setFixedWidth(120)
+        empty_add_btn.clicked.connect(self._on_add)
+        empty_btn_wrap = QtWidgets.QHBoxLayout()
+        empty_btn_wrap.setAlignment(QtCore.Qt.AlignCenter)
+        empty_btn_wrap.addWidget(empty_add_btn)
+        empty_lay.addLayout(empty_btn_wrap)
+
+        self._right_stack.addWidget(empty_page)  # index 0
+
+        # page 1: 编辑区
+        edit_page = QtWidgets.QWidget()
+        edit_lay = QtWidgets.QVBoxLayout(edit_page)
+        edit_lay.setContentsMargins(0, 0, 0, 0)
+        edit_lay.setSpacing(6)
+
+        self._title_edit = QtWidgets.QLineEdit()
+        self._title_edit.setObjectName("rulesTitleEdit")
+        self._title_edit.setPlaceholderText(tr('rules.placeholder_title'))
+        self._title_edit.textChanged.connect(self._on_title_changed)
+        edit_lay.addWidget(self._title_edit)
+
+        self._content_edit = QtWidgets.QPlainTextEdit()
+        self._content_edit.setObjectName("rulesContentEdit")
+        self._content_edit.setPlaceholderText(tr('rules.placeholder_content'))
+        self._content_edit.textChanged.connect(self._on_content_changed)
+        edit_lay.addWidget(self._content_edit, 1)
+
+        # 底部状态行
+        bottom_row = QtWidgets.QHBoxLayout()
+        bottom_row.setSpacing(6)
+
+        self._source_label = QtWidgets.QLabel("")
+        self._source_label.setObjectName("rulesSourceLabel")
+        bottom_row.addWidget(self._source_label, 1)
+
+        self._btn_toggle = QtWidgets.QPushButton(tr('rules.disable'))
+        self._btn_toggle.setObjectName("rulesToggleBtn")
+        self._btn_toggle.setCursor(QtCore.Qt.PointingHandCursor)
+        self._btn_toggle.clicked.connect(self._on_toggle_enabled)
+        bottom_row.addWidget(self._btn_toggle)
+
+        edit_lay.addLayout(bottom_row)
+
+        self._right_stack.addWidget(edit_page)  # index 1
+
+        body.addWidget(self._right_stack, 1)
+        root.addLayout(body, 1)
+
+        # ---- 底部栏 ----
+        footer = QtWidgets.QFrame()
+        footer.setObjectName("rulesFooter")
+        footer.setFixedHeight(36)
+        footer_lay = QtWidgets.QHBoxLayout(footer)
+        footer_lay.setContentsMargins(14, 0, 14, 0)
+        footer_lay.setSpacing(6)
+        footer_lay.addStretch()
+
+        self._btn_open_dir = QtWidgets.QPushButton(f"📂  {tr('rules.open_folder')}")
+        self._btn_open_dir.setObjectName("rulesFooterBtn")
+        self._btn_open_dir.setCursor(QtCore.Qt.PointingHandCursor)
+        self._btn_open_dir.clicked.connect(self._on_open_dir)
+        footer_lay.addWidget(self._btn_open_dir)
+
+        root.addWidget(footer)
+
+        # 初始显示空状态
+        self._right_stack.setCurrentIndex(0)
 
     def _load_rules(self):
         """从 rules_manager 加载所有规则"""
@@ -7087,9 +7126,12 @@ class RulesEditorDialog(QtWidgets.QDialog):
         enabled_count = sum(1 for r in self._rules if r.get("enabled", True))
         self._count_label.setText(tr('rules.count', enabled_count))
 
-        # 空状态
+        # 空状态 / 编辑区切换
         has_rules = len(self._rules) > 0
-        self._empty_label.setVisible(not has_rules)
+        if not has_rules:
+            self._right_stack.setCurrentIndex(0)  # 空状态页
+        else:
+            self._right_stack.setCurrentIndex(1)  # 编辑页
 
         # 恢复选中
         if self._current_rule_id:
@@ -7145,11 +7187,11 @@ class RulesEditorDialog(QtWidgets.QDialog):
         self._set_editor_enabled(True)
 
     def _set_editor_enabled(self, enabled: bool):
-        """启用/禁用右侧编辑器"""
-        self._title_edit.setVisible(enabled)
-        self._content_edit.setVisible(enabled)
-        self._source_label.setVisible(enabled)
-        self._btn_toggle.setVisible(enabled)
+        """切换右侧面板：编辑区 / 空状态"""
+        if enabled:
+            self._right_stack.setCurrentIndex(1)
+        else:
+            self._right_stack.setCurrentIndex(0)
 
     def _on_title_changed(self, text: str):
         """标题变更时实时保存"""

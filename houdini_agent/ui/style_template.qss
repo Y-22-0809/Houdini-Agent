@@ -2233,7 +2233,7 @@ QDialog#pluginManagerDlg QCheckBox::indicator:checked {
 
 
 /* ============================================================
-   RULES EDITOR DIALOG (warm khaki)
+   RULES EDITOR DIALOG (warm khaki — redesigned)
    ============================================================ */
 
 QDialog#rulesEditorDlg {
@@ -2243,21 +2243,33 @@ QDialog#rulesEditorDlg {
     border-radius: 8px;
     color: #d4c5b0;
 }
+
+/* ---- Header bar ---- */
+QFrame#rulesHeader {
+    background: rgba(212,165,116,12);
+    border-bottom: 1px solid rgba(180,160,130,15);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
 QLabel#rulesEditorTitle {
     font-size: {FS_LG}px;
     font-weight: bold;
     color: #d4c5b0;
     background: transparent;
-    padding: 4px 0;
 }
 QLabel#rulesCountLabel {
     font-size: {FS_XS}px;
     color: #8a7e6e;
     background: transparent;
 }
+
+/* ---- Left panel ---- */
+QFrame#rulesLeftPanel {
+    background: transparent;
+}
 QListWidget#rulesList {
-    background: rgba(30,26,20,200);
-    border: 1px solid rgba(180,160,130,12);
+    background: rgba(22,19,14,220);
+    border: 1px solid rgba(180,160,130,10);
     border-radius: 6px;
     outline: none;
     padding: 4px;
@@ -2265,40 +2277,82 @@ QListWidget#rulesList {
     color: #d4c5b0;
 }
 QListWidget#rulesList::item {
-    padding: 6px 8px;
-    border-radius: 4px;
+    padding: 7px 10px;
+    border-radius: 5px;
     margin: 1px 0;
 }
 QListWidget#rulesList::item:hover {
-    background: rgba(180,160,130,8);
+    background: rgba(180,160,130,10);
 }
 QListWidget#rulesList::item:selected {
-    background: rgba(212,165,116,18);
-    border: 1px solid rgba(212,165,116,40);
+    background: rgba(212,165,116,22);
+    border: 1px solid rgba(212,165,116,45);
     color: #f0e6d6;
 }
+
+/* ---- Left panel buttons ---- */
+QPushButton#rulesAddBtn {
+    font-size: {FS_SM}px;
+    border-radius: 5px;
+    padding: 5px 12px;
+    background: rgba(212,165,116,18);
+    color: #d4a574;
+    border: 1px solid rgba(212,165,116,35);
+    font-weight: bold;
+}
+QPushButton#rulesAddBtn:hover {
+    background: rgba(212,165,116,32);
+    border-color: rgba(212,165,116,60);
+    color: #e8c8a0;
+}
+QPushButton#rulesDelBtn {
+    font-size: {FS_SM}px;
+    border-radius: 5px;
+    padding: 4px 0;
+    background: rgba(45,40,32,160);
+    color: #8a7e6e;
+    border: 1px solid rgba(180,160,130,12);
+}
+QPushButton#rulesDelBtn:hover {
+    background: rgba(180,60,60,25);
+    color: #d48080;
+    border-color: rgba(180,60,60,40);
+}
+
+/* ---- Right stack (empty state) ---- */
+QStackedWidget#rulesRightStack {
+    background: transparent;
+}
+QLabel#rulesEmptyHint {
+    color: #7a6e5e;
+    font-size: {FS_SM}px;
+    background: transparent;
+    padding: 12px 20px;
+}
+
+/* ---- Right stack (edit area) ---- */
 QLineEdit#rulesTitleEdit {
-    background: rgba(30,26,20,200);
+    background: rgba(22,19,14,200);
     border: 1px solid rgba(180,160,130,12);
     border-radius: 5px;
-    padding: 6px 8px;
+    padding: 7px 10px;
     color: #d4c5b0;
     font-size: {FS_MD}px;
     font-weight: bold;
 }
 QLineEdit#rulesTitleEdit:focus {
-    border: 1px solid rgba(212,165,116,60);
-    background: rgba(35,30,24,230);
+    border: 1px solid rgba(212,165,116,55);
+    background: rgba(28,24,18,240);
 }
 QLineEdit#rulesTitleEdit[readOnly="true"] {
-    background: rgba(30,26,20,120);
+    background: rgba(22,19,14,120);
     color: #8a7e6e;
 }
 QPlainTextEdit#rulesContentEdit {
-    background: rgba(30,26,20,200);
+    background: rgba(22,19,14,200);
     border: 1px solid rgba(180,160,130,12);
     border-radius: 5px;
-    padding: 8px;
+    padding: 8px 10px;
     color: #d4c5b0;
     font-size: {FS_SM}px;
     font-family: 'Microsoft YaHei', 'SimSun', 'Consolas', monospace;
@@ -2306,11 +2360,11 @@ QPlainTextEdit#rulesContentEdit {
     selection-color: #f0e6d6;
 }
 QPlainTextEdit#rulesContentEdit:focus {
-    border: 1px solid rgba(212,165,116,60);
-    background: rgba(35,30,24,230);
+    border: 1px solid rgba(212,165,116,55);
+    background: rgba(28,24,18,240);
 }
 QPlainTextEdit#rulesContentEdit[readOnly="true"] {
-    background: rgba(30,26,20,120);
+    background: rgba(22,19,14,120);
     color: #8a7e6e;
 }
 QLabel#rulesSourceLabel {
@@ -2319,20 +2373,40 @@ QLabel#rulesSourceLabel {
     background: transparent;
     padding: 2px 0;
 }
-QLabel#rulesEmptyHint {
-    color: #8a7e6e;
-    font-size: {FS_SM}px;
+
+/* ---- Toggle button ---- */
+QPushButton#rulesToggleBtn {
+    font-size: {FS_XS}px;
+    border-radius: 4px;
+    padding: 3px 10px;
+    background: rgba(45,40,32,160);
+    color: #b0a08c;
+    border: 1px solid rgba(180,160,130,12);
+}
+QPushButton#rulesToggleBtn:hover {
+    background: rgba(55,48,38,200);
+    color: #d4c5b0;
+    border-color: rgba(212,165,116,40);
+}
+
+/* ---- Footer bar ---- */
+QFrame#rulesFooter {
+    background: rgba(212,165,116,6);
+    border-top: 1px solid rgba(180,160,130,10);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+QPushButton#rulesFooterBtn {
+    font-size: {FS_XS}px;
+    border-radius: 4px;
+    padding: 4px 10px;
     background: transparent;
-    padding: 20px;
+    color: #8a7e6e;
+    border: none;
 }
-QSplitter#rulesSplitter::handle {
+QPushButton#rulesFooterBtn:hover {
     background: rgba(180,160,130,10);
-    width: 2px;
-    margin: 4px 6px;
-    border-radius: 1px;
-}
-QSplitter#rulesSplitter::handle:hover {
-    background: rgba(212,165,116,40);
+    color: #d4a574;
 }
 
 
