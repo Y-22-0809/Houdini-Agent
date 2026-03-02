@@ -2025,9 +2025,15 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         """在主线程执行工具（线程安全）
         
         使用 BlockingQueuedConnection + Queue 确保：
-        1. Houdini 操作在主线程执行
+        1. Houdini 操作在主线程执行（hou 模块非线程安全，macOS 尤其严格）
         2. 多个工具调用不会竞争
         3. 结果安全传递回调用线程
+        
+        ★ macOS 崩溃修复说明：
+        Houdini 嵌入 Qt 时，macOS 的 Cocoa 事件循环比 Windows 更严格。
+        所有 hou API 调用必须在主线程执行，否则会导致段错误或 EXC_BAD_ACCESS。
+        BlockingQueuedConnection 保证信号在目标线程（主线程）的事件循环中执行，
+        且 emit 会阻塞调用线程直到槽函数返回，实现了线程安全的同步调用。
         """
         # 使用锁确保一次只有一个工具调用（避免并发竞争）
         with self._tool_lock:
@@ -2043,8 +2049,11 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             self._executeToolRequest.emit(tool_name, kwargs)
             
             # 从队列获取结果（有超时保护）
+            # ★ 注意：BlockingQueuedConnection 已保证 emit 返回时槽函数执行完毕，
+            #   但使用 Queue 作为双重保险，应对某些 PySide2 版本的边缘情况。
+            #   超时设为 60s，因为 execute_python 等工具可能运行较长时间。
             try:
-                result = self._tool_result_queue.get(timeout=30.0)
+                result = self._tool_result_queue.get(timeout=60.0)
                 return result
             except queue.Empty:
                 return {"success": False, "error": tr('ai.main_exec_timeout')}
@@ -2471,7 +2480,18 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         注意：此方法在主线程中执行，直接操作 Houdini API 是安全的。
         所有修改操作包裹在 undo group 中，支持一键撤销整个 Agent 操作。
         ★ 对于未自带 checkpoint 的修改工具，会在执行前后快照网络子节点以检测变更。
+        
+        ★ macOS 线程安全说明：
+        Houdini 的 hou 模块不是线程安全的。macOS 上 Cocoa/AppKit 要求 UI 和
+        场景操作必须在主线程执行，否则会导致 EXC_BAD_ACCESS。
+        此方法通过 BlockingQueuedConnection 信号从后台线程触发，保证在主线程执行。
         """
+        # ★ 主线程断言（调试辅助：如果在非主线程执行，输出警告）
+        _app = QtWidgets.QApplication.instance()
+        if _app and _app.thread() != QtCore.QThread.currentThread():
+            print(f"[⚠️ THREAD SAFETY] _on_execute_tool_main_thread 不在主线程执行! "
+                  f"tool={tool_name}, current_thread={QtCore.QThread.currentThread()}")
+        
         result = {"success": False, "error": tr('ai.unknown_err')}
         
         # 判断是否为修改操作（需要 undo group）
@@ -2587,11 +2607,22 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                     hou.undos.endGroup()
                 except Exception:
                     pass
-            # 给 Houdini 主线程处理 UI 事件的机会（防止事件堆积导致崩溃）
-            try:
-                QtWidgets.QApplication.processEvents()
-            except Exception:
-                pass
+
+            # ★ macOS 崩溃修复：不再在此处调用 processEvents()
+            # ─────────────────────────────────────────────────────
+            # 旧代码：QtWidgets.QApplication.processEvents()
+            #
+            # 为什么移除？
+            # 1. 此槽函数通过 BlockingQueuedConnection 从后台线程触发，
+            #    在 emit 返回前主线程事件循环不会处理新事件——这是设计意图。
+            # 2. processEvents() 会在槽函数内部递归处理事件队列，可能导致：
+            #    a) 递归触发另一个 _executeToolRequest 信号（死锁或重入）
+            #    b) 触发 Houdini 场景事件、渲染回调等（与当前 hou 操作竞争）
+            #    c) macOS Cocoa runloop 重入，导致 EXC_BAD_ACCESS 崩溃
+            # 3. BlockingQueuedConnection 返回后，主线程事件循环自然会继续
+            #    处理排队的事件——无需手动 processEvents。
+            # ─────────────────────────────────────────────────────
+
             # 将结果放入队列（线程安全）
             self._tool_result_queue.put(result)
 
