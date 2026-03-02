@@ -2761,8 +2761,10 @@ class StreamingPlanCard(QtWidgets.QWidget):
         self._dag_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._dag_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._dag_scroll.setWidget(self._dag_widget)
+        # ★ 高度完全跟随 DAG 内容，不设上限，确保架构图完整显示
         h = self._dag_widget._content_h
-        self._dag_scroll.setFixedHeight(min(h, 400) if h > 0 else 200)
+        scrollbar_h = 14  # 横向滚动条高度预留
+        self._dag_scroll.setFixedHeight((h + scrollbar_h) if h > 0 else 200)
         self._card_lay.addWidget(self._dag_scroll)
 
         # ── 进度条 ──
@@ -2875,8 +2877,10 @@ class StreamingPlanCard(QtWidgets.QWidget):
         if collapsed:
             self._dag_scroll.setFixedHeight(0)
         else:
+            # ★ 高度完全跟随 DAG 内容，不设上限
             h = self._dag_widget._content_h
-            self._dag_scroll.setFixedHeight(min(h + 14, 400) if h > 0 else 200)
+            scrollbar_h = 14
+            self._dag_scroll.setFixedHeight((h + scrollbar_h) if h > 0 else 200)
 
     def _update_progress(self):
         if not self._progress_bar:
@@ -3168,9 +3172,10 @@ class PlanViewer(QtWidgets.QWidget):
         self._dag_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._dag_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._dag_scroll.setWidget(self._dag_widget)
-        # 初始展开：高度跟随 DAG 内容
+        # ★ 高度完全跟随 DAG 内容，不设上限，确保架构图完整显示
         h = self._dag_widget._content_h
-        self._dag_scroll.setFixedHeight(min(h, 400) if h > 0 else 200)
+        scrollbar_h = 14  # 横向滚动条高度预留
+        self._dag_scroll.setFixedHeight((h + scrollbar_h) if h > 0 else 200)
         card_lay.addWidget(self._dag_scroll)
 
         # ── 进度条 ──
