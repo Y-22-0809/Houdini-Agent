@@ -48,6 +48,7 @@ class AgentRunnerMixin:
         'execute_shell',       # subprocess.run，不依赖 hou
         'search_local_doc',    # 纯 Python 文本检索
         'list_skills',         # 纯 Python 列表
+        'search_memory',       # 纯 Python 记忆库检索
     })
 
     # 静默工具：不在执行列表 UI 中显示（AI 自行调用，用户无需感知）
@@ -84,6 +85,8 @@ class AgentRunnerMixin:
         'list_network_boxes',
         'perf_start_profile',
         'perf_stop_and_report',
+        # 记忆搜索（只读）
+        'search_memory',
         # ★ Plan 专用
         'create_plan',
         'ask_question',
@@ -131,6 +134,8 @@ class AgentRunnerMixin:
         # PerfMon 性能分析（只读）
         'perf_start_profile',
         'perf_stop_and_report',
+        # 记忆搜索（只读）
+        'search_memory',
     })
 
     # ---------- 自动 AI 标题生成 ----------

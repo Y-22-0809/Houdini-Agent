@@ -34,6 +34,7 @@ class HeaderMixin:
         self.provider_combo.addItem("GLM", 'glm')
         self.provider_combo.addItem("OpenAI", 'openai')
         self.provider_combo.addItem("Duojie", 'duojie')
+        self.provider_combo.addItem("OpenRouter", 'openrouter')
         self.provider_combo.setMinimumWidth(70)
         self.provider_combo.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         row.addWidget(self.provider_combo)
@@ -61,6 +62,24 @@ class HeaderMixin:
                 'MiniMax-M2.5',
                 'qwen3.5-plus',
             ],
+            'openrouter': [
+                'anthropic/claude-sonnet-4.6',
+                'anthropic/claude-opus-4.6',
+                'anthropic/claude-sonnet-4.5',
+                'anthropic/claude-haiku-4.5',
+                'openai/gpt-5.2',
+                'openai/gpt-5.3-codex',
+                'openai/o4-mini',
+                'google/gemini-3-flash-preview',
+                'google/gemini-2.5-pro',
+                'google/gemini-2.5-flash',
+                'deepseek/deepseek-v3.2',
+                'deepseek/deepseek-r1',
+                'x-ai/grok-4.1-fast',
+                'meta-llama/llama-4-maverick',
+                'qwen/qwen3-235b-a22b',
+                'mistralai/mistral-large-2512',
+            ],
         }
         self._model_context_limits = {
             'qwen2.5:14b': 32000, 'qwen2.5:7b': 32000, 'llama3:8b': 8000, 'mistral:7b': 32000,
@@ -82,6 +101,23 @@ class HeaderMixin:
             'kimi-k2.5': 128000,
             'MiniMax-M2.5': 128000,
             'qwen3.5-plus': 128000,
+            # OpenRouter 模型
+            'anthropic/claude-sonnet-4.6': 1000000,
+            'anthropic/claude-opus-4.6': 1000000,
+            'anthropic/claude-sonnet-4.5': 1000000,
+            'anthropic/claude-haiku-4.5': 200000,
+            'openai/gpt-5.2': 400000,
+            'openai/gpt-5.3-codex': 400000,
+            'openai/o4-mini': 200000,
+            'google/gemini-3-flash-preview': 1048576,
+            'google/gemini-2.5-pro': 1048576,
+            'google/gemini-2.5-flash': 1048576,
+            'deepseek/deepseek-v3.2': 163840,
+            'deepseek/deepseek-r1': 64000,
+            'x-ai/grok-4.1-fast': 2000000,
+            'meta-llama/llama-4-maverick': 1048576,
+            'qwen/qwen3-235b-a22b': 131072,
+            'mistralai/mistral-large-2512': 262144,
         }
         # 模型特性配置
         self._model_features = {
@@ -113,6 +149,23 @@ class HeaderMixin:
             'kimi-k2.5':                  {'supports_prompt_caching': True, 'supports_vision': False},
             'MiniMax-M2.5':               {'supports_prompt_caching': True, 'supports_vision': False},
             'qwen3.5-plus':               {'supports_prompt_caching': True, 'supports_vision': False},
+            # OpenRouter 模型
+            'anthropic/claude-sonnet-4.6':        {'supports_prompt_caching': True, 'supports_vision': True},
+            'anthropic/claude-opus-4.6':          {'supports_prompt_caching': True, 'supports_vision': True},
+            'anthropic/claude-sonnet-4.5':        {'supports_prompt_caching': True, 'supports_vision': True},
+            'anthropic/claude-haiku-4.5':         {'supports_prompt_caching': True, 'supports_vision': True},
+            'openai/gpt-5.2':                     {'supports_prompt_caching': True, 'supports_vision': True},
+            'openai/gpt-5.3-codex':               {'supports_prompt_caching': True, 'supports_vision': True},
+            'openai/o4-mini':                     {'supports_prompt_caching': True, 'supports_vision': True},
+            'google/gemini-3-flash-preview':      {'supports_prompt_caching': True, 'supports_vision': True},
+            'google/gemini-2.5-pro':              {'supports_prompt_caching': True, 'supports_vision': True},
+            'google/gemini-2.5-flash':            {'supports_prompt_caching': True, 'supports_vision': True},
+            'deepseek/deepseek-v3.2':             {'supports_prompt_caching': True, 'supports_vision': False},
+            'deepseek/deepseek-r1':               {'supports_prompt_caching': True, 'supports_vision': False},
+            'x-ai/grok-4.1-fast':                 {'supports_prompt_caching': True, 'supports_vision': True},
+            'meta-llama/llama-4-maverick':        {'supports_prompt_caching': True, 'supports_vision': True},
+            'qwen/qwen3-235b-a22b':               {'supports_prompt_caching': True, 'supports_vision': False},
+            'mistralai/mistral-large-2512':       {'supports_prompt_caching': True, 'supports_vision': True},
         }
         self._refresh_models('ollama')
         self.model_combo.setMinimumWidth(100)

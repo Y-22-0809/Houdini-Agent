@@ -383,16 +383,21 @@ class AITab(
             pass
 
     def _activate_long_term_memory(self, user_message: str, scene_context: dict = None) -> str:
-        """动态记忆激活 — "我想起来了"
+        """动态记忆激活 — 分层 chunk 检索
 
-        核心机制:
-        1. 当前问题 embedding
-        2. 检索相关 episodic (具体经历)
-        3. 检索相关 semantic (抽象知识)
-        4. 检索适用的 strategies (策略)
-        5. 按 importance * relevance 排序，压缩注入
+        6 层抽象层级体系：
+        - L0 (核心身份): 已在 sys_prompt 中加载，此处跳过
+        - L1 (核心偏好): embedding 检索, top_k=3, threshold=0.15
+        - L2 (经验规则): embedding 检索, top_k=3, threshold=0.25
+        - L3 (工作流模式): embedding 检索, top_k=2, threshold=0.35
+        - L4-L5: 不自动注入，仅通过 search_memory 工具检索
 
-        Context = WorkingMemory + TopK(RelevanceMemory)
+        每层独立取 TopK chunk，互不挤占。
+        每条 chunk 附带置信度标注，明确标注"仅供参考"。
+
+        ★ 注意: fallback embedding (n-gram hash) 的 cosine similarity 值域约 0~0.4，
+        远低于 sentence-transformers 的 0~1.0。threshold 会在 search_by_level 内部
+        自动缩放以适配不同后端。Episodic / Procedural 的 score 阈值也需同样处理。
         """
         if not self._memory_initialized or not self._memory_store:
             return ""
@@ -407,45 +412,57 @@ class AITab(
                 if selected_types:
                     query += ' ' + ' '.join(selected_types)
 
+            # ★ fallback 模式下 cosine similarity 值域很低，缩放 score 阈值
+            _is_semantic = store.embedder.is_semantic
+            _ep_threshold = 0.3 if _is_semantic else 0.05
+            _proc_threshold = 0.25 if _is_semantic else 0.04
+
             parts = []
 
-            # 1. 检索相关 episodic (具体经历) — TopK=3
-            episodes = store.search_episodic(query, top_k=3, min_importance=0.2)
+            # ── L1: 核心偏好 (top_k=3, threshold=0.15) ──
+            l1_results = store.search_by_level(query, level=1, top_k=3, threshold=0.15)
+            for rec, score in l1_results:
+                parts.append(f"[L1 Preference] (conf={rec.confidence:.2f}) {rec.rule[:120]}")
+                store.increment_semantic_activation(rec.id)
+
+            # ── L2: 经验规则 (top_k=3, threshold=0.25) ──
+            l2_results = store.search_by_level(query, level=2, top_k=3, threshold=0.25)
+            for rec, score in l2_results:
+                parts.append(f"[L2 Rule] (conf={rec.confidence:.2f}) {rec.rule[:120]}")
+                store.increment_semantic_activation(rec.id)
+
+            # ── L3: 工作流模式 (top_k=2, threshold=0.35) ──
+            l3_results = store.search_by_level(query, level=3, top_k=2, threshold=0.35)
+            for rec, score in l3_results:
+                parts.append(f"[L3 Workflow] (conf={rec.confidence:.2f}) {rec.rule[:120]}")
+                store.increment_semantic_activation(rec.id)
+
+            # ── Episodic: 相关经历 (top_k=2) ──
+            episodes = store.search_episodic(query, top_k=2, min_importance=0.3)
             for ep, score in episodes:
-                if score > 0.3:
+                if score > _ep_threshold:
                     status = "✅" if ep.success else "❌"
                     parts.append(
                         f"[Past Experience] {status} {ep.task_description[:80]} "
                         f"→ {ep.result_summary[:60]}"
                     )
-                    # ★ 修复：episodic 激活应更新 importance，而非调用 semantic 表的方法
                     try:
-                        new_imp = min(5.0, ep.importance * 1.05)  # 轻微强化
+                        new_imp = min(5.0, ep.importance * 1.05)
                         store.update_episodic_importance(ep.id, new_imp)
                     except Exception:
                         pass
 
-            # 2. 检索相关 semantic (抽象知识) — TopK=5
-            rules = store.search_semantic(query, top_k=5, min_confidence=0.3)
-            for rule, score in rules:
-                if score > 0.25:
-                    parts.append(f"[Learned Rule] {rule.rule[:100]}")
-                    store.increment_semantic_activation(rule.id)
-
-            # 3. 检索适用的 strategies — TopK=3
-            strategies = store.search_procedural(query, top_k=3)
+            # ── Procedural: 适用策略 (top_k=2) ──
+            strategies = store.search_procedural(query, top_k=2)
             for strat, score in strategies:
-                if score > 0.2:
+                if score > _proc_threshold:
                     parts.append(f"[Strategy] {strat.description[:80]}")
 
             if not parts:
                 return ""
 
-            # 限制注入量（最多 800 字符，提供更完整的记忆上下文）
-            result = "[Long-Term Memory]\n" + "\n".join(parts)
-            if len(result) > 800:
-                result = result[:800] + "..."
-
+            header = "[Long-Term Memory — 历史经验仅供参考，请结合当前上下文判断]"
+            result = header + "\n" + "\n".join(parts)
             return result
 
         except Exception as e:
@@ -3385,6 +3402,19 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             if personality_text:
                 sys_prompt = sys_prompt + "\n\n" + personality_text
             
+            # ★ L0 核心记忆加载：全部加载到 sys_prompt（上限 5 条，按 confidence TopK）
+            if self._memory_initialized and self._memory_store:
+                try:
+                    core_mems = self._memory_store.get_core_memories(max_count=5)
+                    if core_mems:
+                        core_lines = [f"- {m.rule}" for m in core_mems]
+                        sys_prompt = sys_prompt + (
+                            "\n\n[Core Memory — 以下为核心记忆，仅供参考，请结合当前上下文判断]\n"
+                            + "\n".join(core_lines)
+                        )
+                except Exception as e:
+                    print(f"[Memory] L0 核心记忆加载失败: {e}")
+            
             # ★ 用户自定义规则注入（类似 Cursor Rules）
             rules_text = self._get_user_rules_injection()
             if rules_text:
@@ -4799,7 +4829,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
 
     def _on_set_key(self):
         provider = self._current_provider()
-        names = {'openai': 'OpenAI', 'deepseek': 'DeepSeek', 'glm': 'GLM（智谱AI）', 'ollama': 'Ollama'}
+        names = {'openai': 'OpenAI', 'deepseek': 'DeepSeek', 'glm': 'GLM（智谱AI）', 'ollama': 'Ollama', 'openrouter': 'OpenRouter'}
         
         key, ok = QtWidgets.QInputDialog.getText(
             self, f"Set {names.get(provider, provider)} API Key",
@@ -4876,6 +4906,275 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         # 更新统计显示
         self._update_token_stats_display()
         self._update_context_stats()
+
+    # ============================================================
+    # ★ 斜杠命令执行
+    # ============================================================
+
+    def _execute_slash_command(self, command: str):
+        """执行斜杠命令 — 由 InputAreaMixin._on_slash_command_selected 调用"""
+        handler = getattr(self, f'_slash_{command}', None)
+        if handler:
+            handler()
+        else:
+            print(f"[SlashCommand] 未知命令: /{command}")
+
+    def _slash_clear(self):
+        """/ clear — 清空当前对话"""
+        self._on_clear()
+
+    def _slash_new(self):
+        """/new — 新建会话"""
+        self._new_session()
+
+    def _slash_memory(self):
+        """/memory — 显示记忆系统状态"""
+        from ..utils.memory_store import get_memory_store, ABSTRACTION_LEVELS, MEMORY_CATEGORIES
+        try:
+            store = get_memory_store()
+            stats = store.get_stats()
+            core_mems = store.get_core_memories(max_count=10)
+
+            lines = ["📊 **长期记忆系统状态**\n"]
+            lines.append(f"- 情景记忆 (Episodic): {stats.get('episodic_count', 0)} 条")
+            lines.append(f"- 语义记忆 (Semantic): {stats.get('semantic_count', 0)} 条")
+            lines.append(f"- 策略记忆 (Procedural): {stats.get('procedural_count', 0)} 条")
+            lines.append(f"- 嵌入后端: {stats.get('backend', 'unknown')}")
+            lines.append(f"- 向量维度: {stats.get('embedding_dim', 0)}")
+
+            if core_mems:
+                lines.append(f"\n🧠 **核心记忆 (L0)** — {len(core_mems)} 条:")
+                for i, mem in enumerate(core_mems, 1):
+                    conf = f"(conf={mem.confidence:.2f})" if hasattr(mem, 'confidence') else ""
+                    lines.append(f"  {i}. [{mem.category}] {mem.rule} {conf}")
+            else:
+                lines.append("\n🧠 核心记忆 (L0): 暂无")
+
+            # 显示成长指标
+            if self._memory_initialized and self._growth_tracker:
+                try:
+                    gm = self._growth_tracker.get_growth_metrics()
+                    lines.append(f"\n📈 **成长指标:**")
+                    lines.append(f"  - 成功率: {gm.get('success_rate', 0):.1%}")
+                    lines.append(f"  - 错误率: {gm.get('error_rate', 0):.1%}")
+                    lines.append(f"  - 成长分: {gm.get('growth_score', 0):.2f}")
+                    lines.append(f"  - 任务数: {gm.get('total_tasks', 0)}")
+                except Exception:
+                    pass
+
+            content = "\n".join(lines)
+            self._add_user_message("[/memory]")
+            resp = self._add_ai_response()
+            resp.set_content(content)
+            resp.finalize()
+        except Exception as e:
+            self._add_user_message("[/memory]")
+            resp = self._add_ai_response()
+            resp.set_content(f"❌ 记忆系统未就绪: {e}")
+            resp.finalize()
+
+    def _slash_remember(self):
+        """/remember — 弹出对话框让用户输入要记住的内容"""
+        from ..utils.memory_store import get_memory_store, SemanticRecord
+
+        text, ok = QtWidgets.QInputDialog.getText(
+            self, "📌 记住偏好", "输入要永久记住的内容（将存为 L0 核心记忆）:"
+        )
+        if not ok or not text.strip():
+            return
+
+        try:
+            store = get_memory_store()
+            record = SemanticRecord(
+                rule=text.strip(),
+                confidence=1.0,
+                category="preference",
+                abstraction_level=0,
+            )
+            rid = store.add_semantic(record)
+            self._add_user_message(f"[/remember] {text.strip()}")
+            resp = self._add_ai_response()
+            resp.set_content(f"✅ 已写入核心记忆 (L0): {text.strip()}\nID: `{rid}`")
+            resp.finalize()
+        except Exception as e:
+            self._add_user_message(f"[/remember]")
+            resp = self._add_ai_response()
+            resp.set_content(f"❌ 写入记忆失败: {e}")
+            resp.finalize()
+
+    def _slash_forget(self):
+        """/forget — 搜索并删除记忆"""
+        from ..utils.memory_store import get_memory_store
+
+        keyword, ok = QtWidgets.QInputDialog.getText(
+            self, "🧹 清除记忆", "输入关键词搜索要删除的记忆:"
+        )
+        if not ok or not keyword.strip():
+            return
+
+        try:
+            store = get_memory_store()
+            results = store.search_all_levels(
+                query=keyword.strip(), top_k=5, min_confidence=0.0
+            )
+            if not results:
+                self._add_user_message(f"[/forget] {keyword.strip()}")
+                resp = self._add_ai_response()
+                resp.set_content("未找到匹配的记忆。")
+                resp.finalize()
+                return
+
+            # 显示找到的记忆，让用户选择删除
+            items = []
+            for rec, score in results:
+                display = f"[L{rec.abstraction_level}][{rec.category}] {rec.rule[:60]} (conf={rec.confidence:.2f})"
+                items.append((rec.id, display))
+
+            choices = [d for _, d in items]
+            choice, ok2 = QtWidgets.QInputDialog.getItem(
+                self, "选择要删除的记忆", "找到以下匹配记忆:", choices, 0, False
+            )
+            if not ok2:
+                return
+
+            idx = choices.index(choice)
+            del_id = items[idx][0]
+            store.delete_semantic(del_id)
+
+            self._add_user_message(f"[/forget] {keyword.strip()}")
+            resp = self._add_ai_response()
+            resp.set_content(f"🗑 已删除记忆: {choice}")
+            resp.finalize()
+        except Exception as e:
+            self._add_user_message(f"[/forget]")
+            resp = self._add_ai_response()
+            resp.set_content(f"❌ 操作失败: {e}")
+            resp.finalize()
+
+    def _slash_search_mem(self):
+        """/search_mem — 搜索长期记忆"""
+        from ..utils.memory_store import get_memory_store, ABSTRACTION_LEVELS
+
+        keyword, ok = QtWidgets.QInputDialog.getText(
+            self, "🔍 搜索记忆", "输入搜索关键词:"
+        )
+        if not ok or not keyword.strip():
+            return
+
+        try:
+            store = get_memory_store()
+            results = store.search_all_levels(
+                query=keyword.strip(), top_k=10, min_confidence=0.0
+            )
+
+            self._add_user_message(f"[/search_mem] {keyword.strip()}")
+            resp = self._add_ai_response()
+
+            if not results:
+                resp.set_content("未找到相关记忆。")
+            else:
+                lines = [f"🔍 **搜索结果** — 关键词: `{keyword.strip()}`  ({len(results)} 条)\n"]
+                for i, (rec, score) in enumerate(results, 1):
+                    level_name = ABSTRACTION_LEVELS.get(rec.abstraction_level, "unknown")
+                    lines.append(
+                        f"{i}. **[L{rec.abstraction_level} {level_name}]** [{rec.category}] "
+                        f"conf={rec.confidence:.2f}  rel={score:.3f}\n"
+                        f"   {rec.rule}"
+                    )
+                resp.set_content("\n".join(lines))
+            resp.finalize()
+        except Exception as e:
+            self._add_user_message(f"[/search_mem]")
+            resp = self._add_ai_response()
+            resp.set_content(f"❌ 搜索失败: {e}")
+            resp.finalize()
+
+    def _slash_network(self):
+        """/network — 读取网络结构"""
+        self._on_read_network()
+
+    def _slash_selection(self):
+        """/selection — 读取选中节点"""
+        self._on_read_selection()
+
+    def _slash_skills(self):
+        """/skills — 列出所有技能"""
+        result = self.mcp._tool_list_skills({})
+        self._add_user_message("[/skills]")
+        resp = self._add_ai_response()
+        if result.get('success'):
+            resp.set_content(result.get('result', '无可用 Skill'))
+        else:
+            resp.set_content(f"❌ {result.get('error', '未知错误')}")
+        resp.finalize()
+
+    def _slash_status(self):
+        """/status — 显示系统综合状态"""
+        lines = ["📊 **系统状态概览**\n"]
+
+        # 上下文统计
+        token_stats = self._token_stats
+        lines.append("**Token 统计:**")
+        lines.append(f"  - 输入: {token_stats.get('input_tokens', 0):,}")
+        lines.append(f"  - 输出: {token_stats.get('output_tokens', 0):,}")
+        lines.append(f"  - 总计: {token_stats.get('total_tokens', 0):,}")
+        lines.append(f"  - 请求次数: {token_stats.get('requests', 0)}")
+        cost = token_stats.get('estimated_cost', 0.0)
+        if cost > 0:
+            lines.append(f"  - 预估费用: ${cost:.4f}")
+        lines.append(f"  - 对话轮数: {len(self._conversation_history)}")
+
+        # 记忆统计
+        if self._memory_initialized and self._memory_store:
+            try:
+                stats = self._memory_store.get_stats()
+                lines.append(f"\n**记忆系统:**")
+                lines.append(f"  - 情景: {stats.get('episodic_count', 0)}")
+                lines.append(f"  - 语义: {stats.get('semantic_count', 0)}")
+                lines.append(f"  - 策略: {stats.get('procedural_count', 0)}")
+            except Exception:
+                pass
+
+        # 成长指标
+        if self._memory_initialized and self._growth_tracker:
+            try:
+                gm = self._growth_tracker.get_growth_metrics()
+                lines.append(f"\n**成长指标:**")
+                lines.append(f"  - 成功率: {gm.get('success_rate', 0):.1%}")
+                lines.append(f"  - 成长分: {gm.get('growth_score', 0):.2f}")
+                lines.append(f"  - 累计任务: {gm.get('total_tasks', 0)}")
+            except Exception:
+                pass
+
+        self._add_user_message("[/status]")
+        resp = self._add_ai_response()
+        resp.set_content("\n".join(lines))
+        resp.finalize()
+
+    def _slash_export(self):
+        """/export — 导出训练数据"""
+        self._on_export_training_data()
+
+    def _slash_image(self):
+        """/image — 附加图片"""
+        self._on_attach_image()
+
+    def _slash_help(self):
+        """/help — 显示所有斜杠命令"""
+        from .cursor_widgets import SLASH_COMMANDS
+        from .i18n import get_language
+
+        is_zh = (get_language() == 'zh')
+        lines = ["❓ **可用斜杠命令**\n"]
+        for cmd, icon, lbl_zh, lbl_en, desc_zh, desc_en, cat in SLASH_COMMANDS:
+            label = lbl_zh if is_zh else lbl_en
+            desc = desc_zh if is_zh else desc_en
+            lines.append(f"  {icon} `/{cmd}` — {label}: {desc}")
+
+        self._add_user_message("[/help]")
+        resp = self._add_ai_response()
+        resp.set_content("\n".join(lines))
+        resp.finalize()
 
     def _on_read_network(self):
         ok, text = self.mcp.get_network_structure_text()

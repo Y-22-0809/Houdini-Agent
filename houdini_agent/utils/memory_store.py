@@ -58,6 +58,29 @@ class EpisodicRecord:
             self.timestamp = time.time()
 
 
+# 用途分类常量
+MEMORY_CATEGORIES = (
+    "preference",     # 日常偏好（代码风格、输出语言、格式）
+    "command",        # 构建命令（编译、测试、部署常用命令）
+    "debug",          # 调试模式（调试思路和路径）
+    "pitfall",        # 踩坑记录（特殊限制和陷阱）
+    "workflow",       # 工作流模式（节点连接、操作序列）
+    "knowledge",      # 技术知识（节点用法、VEX 语法）
+    "user_profile",   # 用户画像（工作领域、技能水平）
+    "general",        # 其他通用经验
+)
+
+# 抽象层级常量（6 层）
+ABSTRACTION_LEVELS = {
+    0: "core_identity",   # 核心身份：用户身份、核心偏好、语言习惯（极少极精炼）
+    1: "core_preference",  # 核心偏好：代码风格、格式偏好、交互习惯
+    2: "experience_rule",  # 经验规则：可复用经验、最佳实践、调试思路
+    3: "workflow_pattern",  # 工作流模式：具体工作流、命令序列、节点连接
+    4: "specific_case",    # 具体案例：特定任务的成功/失败记录、踩坑详情
+    5: "raw_detail",       # 原始细节：对话片段、参数细节、临时记录
+}
+
+
 @dataclass
 class SemanticRecord:
     """抽象知识记录"""
@@ -69,7 +92,8 @@ class SemanticRecord:
     confidence: float = 0.5
     activation_count: int = 0
     embedding: Optional[np.ndarray] = None
-    category: str = "general"  # error_handling / workflow / vex / nodes / ...
+    category: str = "general"  # preference / command / debug / pitfall / workflow / knowledge / user_profile / general
+    abstraction_level: int = 2  # 0-5，默认 2（经验规则），见 ABSTRACTION_LEVELS
 
     def __post_init__(self):
         if not self.id:
@@ -177,6 +201,21 @@ class MemoryStore:
             CREATE INDEX IF NOT EXISTS idx_procedural_priority ON procedural_memory(priority);
         """)
         conn.commit()
+        # ── DB migration: 添加 abstraction_level 列（兼容旧数据库） ──
+        self._migrate_add_abstraction_level(conn)
+
+    @staticmethod
+    def _migrate_add_abstraction_level(conn: sqlite3.Connection):
+        """为 semantic_memory 表添加 abstraction_level 列（兼容旧 DB）"""
+        try:
+            cols = [row[1] for row in conn.execute("PRAGMA table_info(semantic_memory)").fetchall()]
+            if "abstraction_level" not in cols:
+                conn.execute("ALTER TABLE semantic_memory ADD COLUMN abstraction_level INTEGER DEFAULT 2")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_abstraction ON semantic_memory(abstraction_level)")
+                conn.commit()
+                print("[MemoryStore] Migration: 已添加 abstraction_level 列")
+        except Exception as e:
+            print(f"[MemoryStore] Migration 失败 (非致命): {e}")
 
     def close(self):
         if self._conn:
@@ -321,8 +360,8 @@ class MemoryStore:
         conn.execute(
             """INSERT OR REPLACE INTO semantic_memory
                (id, created_at, updated_at, rule, source_episodes,
-                confidence, activation_count, embedding, category)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+                confidence, activation_count, embedding, category, abstraction_level)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 record.id,
                 record.created_at,
@@ -333,6 +372,7 @@ class MemoryStore:
                 record.activation_count,
                 self.embedder.to_bytes(record.embedding),
                 record.category,
+                record.abstraction_level,
             ),
         )
         conn.commit()
@@ -410,9 +450,114 @@ class MemoryStore:
             return results[0][0]
         return None
 
+    def delete_semantic(self, record_id: str):
+        """删除指定语义记忆"""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM semantic_memory WHERE id=?", (record_id,))
+        conn.commit()
+
     def count_semantic(self) -> int:
         conn = self._get_conn()
         return conn.execute("SELECT COUNT(*) FROM semantic_memory").fetchone()[0]
+
+    # ==========================================================
+    # 分层记忆检索（6 层抽象层级）
+    # ==========================================================
+
+    def get_core_memories(self, max_count: int = 5) -> List[SemanticRecord]:
+        """获取 level=0 核心记忆，按 confidence 降序，最多 max_count 条"""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM semantic_memory WHERE abstraction_level = 0 ORDER BY confidence DESC LIMIT ?",
+            (max_count,)
+        ).fetchall()
+        return [self._row_to_semantic(r) for r in rows]
+
+    def search_by_level(
+        self, query: str, level: int, top_k: int = 3,
+        min_confidence: float = 0.2, threshold: float = 0.25,
+    ) -> List[Tuple[SemanticRecord, float]]:
+        """按指定层级搜索记忆 chunk
+
+        Args:
+            query: 搜索查询
+            level: 抽象层级 (0-5)
+            top_k: 返回条数上限
+            min_confidence: 最低置信度过滤
+            threshold: 最低相似度阈值（会根据 embedding 后端自动缩放）
+
+        Returns:
+            [(record, similarity_score), ...] 按综合分降序
+        """
+        query_vec = self.embedder.encode(query)
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM semantic_memory WHERE abstraction_level = ? AND confidence >= ?",
+            (level, min_confidence)
+        ).fetchall()
+
+        if not rows:
+            return []
+
+        # ★ fallback embedding (n-gram hash) 的 cosine similarity 值域约 0~0.4，
+        #   远低于 sentence-transformers 的 0~1.0。动态缩放阈值以适配。
+        effective_threshold = threshold
+        if not self.embedder.is_semantic:
+            effective_threshold = threshold * 0.2  # 0.25 → 0.05, 0.15 → 0.03
+
+        results = []
+        for row in rows:
+            rec = self._row_to_semantic(row)
+            if rec.embedding is not None:
+                sim = self.embedder.cosine_similarity(query_vec, rec.embedding)
+                if sim >= effective_threshold:
+                    combined = sim * (0.5 + 0.5 * rec.confidence)
+                    results.append((rec, combined))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
+
+    def search_all_levels(
+        self, query: str, category: Optional[str] = None,
+        top_k: int = 5, min_confidence: float = 0.1,
+    ) -> List[Tuple[SemanticRecord, float]]:
+        """跨层级搜索（供 search_memory 工具使用），可按 category 过滤
+
+        Args:
+            query: 搜索查询
+            category: 用途分类过滤（可选）
+            top_k: 返回条数上限
+            min_confidence: 最低置信度过滤
+
+        Returns:
+            [(record, similarity_score), ...] 按综合分降序
+        """
+        query_vec = self.embedder.encode(query)
+        conn = self._get_conn()
+        if category:
+            rows = conn.execute(
+                "SELECT * FROM semantic_memory WHERE category = ? AND confidence >= ?",
+                (category, min_confidence)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM semantic_memory WHERE confidence >= ?",
+                (min_confidence,)
+            ).fetchall()
+
+        if not rows:
+            return []
+
+        results = []
+        for row in rows:
+            rec = self._row_to_semantic(row)
+            if rec.embedding is not None:
+                sim = self.embedder.cosine_similarity(query_vec, rec.embedding)
+                combined = sim * (0.5 + 0.5 * rec.confidence)
+                results.append((rec, combined))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
 
     # ==========================================================
     # Procedural Memory CRUD
@@ -592,6 +737,7 @@ class MemoryStore:
             activation_count=row[6],
             embedding=self.embedder.from_bytes(row[7]) if row[7] else None,
             category=row[8],
+            abstraction_level=row[9] if len(row) > 9 and row[9] is not None else 2,
         )
 
     def _row_to_procedural(self, row) -> ProceduralRecord:

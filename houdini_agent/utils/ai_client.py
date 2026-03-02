@@ -1297,6 +1297,33 @@ HOUDINI_TOOLS = [
                 "required": []
             }
         }
+    },
+    # ★ 长期记忆主动搜索工具
+    {
+        "type": "function",
+        "function": {
+            "name": "search_memory",
+            "description": "搜索长期记忆库。当你需要回忆过去的经验、用户偏好、踩坑记录、调试思路、常用命令时调用此工具。可按用途分类过滤。返回的记忆含置信度，仅供参考。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "搜索关键词或问题描述"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": ["preference", "command", "debug", "pitfall", "workflow", "knowledge", "user_profile", "general"],
+                        "description": "按用途分类过滤（可选）"
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "返回条数，默认5，最大10"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
     }
 ]
 
@@ -1323,6 +1350,7 @@ class AIClient:
     OLLAMA_API_URL = "http://localhost:11434/v1/chat/completions"  # Ollama OpenAI 兼容接口
     DUOJIE_API_URL = "https://api.duojie.games/v1/chat/completions"  # 拼好饭中转站（OpenAI 协议）
     DUOJIE_ANTHROPIC_API_URL = "https://api.duojie.games/v1/messages"  # 拼好饭中转站（Anthropic 协议）
+    OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"  # OpenRouter（OpenAI 兼容）
     
     # 使用 Anthropic 协议的 Duojie 模型
     _DUOJIE_ANTHROPIC_MODELS = frozenset({'glm-4.7', 'glm-5'})
@@ -1343,6 +1371,7 @@ class AIClient:
             'glm': self._read_api_key('glm'),
             'ollama': 'ollama',  # Ollama 不需要真正的 API key，但需要非空值
             'duojie': self._read_api_key('duojie'),
+            'openrouter': self._read_api_key('openrouter'),
         }
         self._ssl_context = self._create_ssl_context()
         self._web_searcher = WebSearcher()
@@ -2229,6 +2258,7 @@ class AIClient:
             'deepseek': ['DEEPSEEK_API_KEY', 'DCC_AI_DEEPSEEK_API_KEY'],
             'glm': ['GLM_API_KEY', 'ZHIPU_API_KEY', 'DCC_AI_GLM_API_KEY'],
             'duojie': ['DUOJIE_API_KEY', 'DCC_AI_DUOJIE_API_KEY'],
+            'openrouter': ['OPENROUTER_API_KEY', 'DCC_AI_OPENROUTER_API_KEY'],
         }
         for env_var in env_map.get(provider, []):
             key = os.environ.get(env_var)
@@ -2239,6 +2269,7 @@ class AIClient:
             key_map = {
                 'openai': 'openai_api_key', 'deepseek': 'deepseek_api_key',
                 'glm': 'glm_api_key', 'duojie': 'duojie_api_key',
+                'openrouter': 'openrouter_api_key',
             }
             return cfg.get(key_map.get(provider, '')) or None
         return None
@@ -2262,7 +2293,8 @@ class AIClient:
         if persist:
             cfg, _ = load_config('ai', dcc_type='houdini')
             cfg = cfg or {}
-            key_map = {'openai': 'openai_api_key', 'deepseek': 'deepseek_api_key', 'glm': 'glm_api_key'}
+            key_map = {'openai': 'openai_api_key', 'deepseek': 'deepseek_api_key', 'glm': 'glm_api_key',
+                       'openrouter': 'openrouter_api_key'}
             cfg[key_map.get(provider, f'{provider}_api_key')] = key
             ok, _ = save_config('ai', cfg, dcc_type='houdini')
             return ok
@@ -2296,13 +2328,15 @@ class AIClient:
             if model and self._is_anthropic_protocol(provider, model):
                 return self.DUOJIE_ANTHROPIC_API_URL
             return self.DUOJIE_API_URL
+        elif provider == 'openrouter':
+            return self.OPENROUTER_API_URL
         return self.OPENAI_API_URL
 
     def _get_vendor_name(self, provider: str) -> str:
         names = {
             'openai': 'OpenAI', 'deepseek': 'DeepSeek',
             'glm': 'GLM（智谱AI）', 'ollama': 'Ollama',
-            'duojie': '拼好饭',
+            'duojie': '拼好饭', 'openrouter': 'OpenRouter',
         }
         return names.get(provider, provider)
     
@@ -2370,7 +2404,8 @@ class AIClient:
             'openai': 'gpt-5.2', 
             'deepseek': 'deepseek-chat', 
             'glm': 'glm-4.7',
-            'ollama': 'qwen2.5:14b'
+            'ollama': 'qwen2.5:14b',
+            'openrouter': 'anthropic/claude-sonnet-4.6',
         }
         return defaults.get(provider, 'gpt-5.2')
 
@@ -3113,6 +3148,11 @@ class AIClient:
         if provider != 'ollama':
             headers['Authorization'] = f'Bearer {api_key}'
         
+        # OpenRouter 需要额外的请求头用于标识来源（参见 https://openrouter.ai/docs/quickstart）
+        if provider == 'openrouter':
+            headers['HTTP-Referer'] = 'https://github.com/Kazama-Suichiku/Houdini-Agent'
+            headers['X-OpenRouter-Title'] = 'Houdini Agent'
+        
         # 重试逻辑
         print(f"[AI Client] Requesting {api_url} with model {model}")
         for attempt in range(self._max_retries):
@@ -3490,6 +3530,11 @@ class AIClient:
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}',
         }
+        
+        # OpenRouter 需要额外的请求头用于标识来源（参见 https://openrouter.ai/docs/quickstart）
+        if provider == 'openrouter':
+            headers['HTTP-Referer'] = 'https://github.com/Kazama-Suichiku/Houdini-Agent'
+            headers['X-OpenRouter-Title'] = 'Houdini Agent'
         
         # ★ Anthropic 协议分支（非流式）
         if self._is_anthropic_protocol(provider, model):

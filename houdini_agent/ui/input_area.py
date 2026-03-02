@@ -7,7 +7,7 @@ Input Area UI 构建 — 输入区域和模式切换
 """
 
 from houdini_agent.qt_compat import QtWidgets, QtCore
-from .i18n import tr
+from .i18n import tr, get_language
 from .cursor_widgets import (
     CursorTheme,
     ChatInput,
@@ -15,6 +15,7 @@ from .cursor_widgets import (
     StopButton,
     UnifiedStatusBar,
     NodeCompleterPopup,
+    SlashCommandPopup,
 )
 
 
@@ -159,6 +160,12 @@ class InputAreaMixin:
         self._node_completer = NodeCompleterPopup(parent=self.input_edit)
         self._node_completer.pathSelected.connect(self._on_node_path_selected)
         self.input_edit.set_completer_popup(self._node_completer)
+
+        # 斜杠命令补全弹出框
+        self._slash_completer = SlashCommandPopup(parent=self.input_edit)
+        self._slash_completer.commandSelected.connect(self._on_slash_command_selected)
+        self.input_edit.set_slash_popup(self._slash_completer)
+        self.input_edit.slashTriggered.connect(self._on_slash_triggered)
         
         # Send / Stop 按钮 — 输入框右侧
         btn_col = QtWidgets.QVBoxLayout()
@@ -263,6 +270,26 @@ class InputAreaMixin:
             return paths
         except ImportError:
             return []
+
+    # ---------- / 斜杠命令自动补全 ----------
+
+    def _on_slash_triggered(self, prefix: str, cursor_rect):
+        """用户在输入框键入 /，显示命令列表"""
+        try:
+            lang = get_language()
+            self._slash_completer.show_filtered(prefix, self.input_edit, cursor_rect, lang)
+        except Exception:
+            self._slash_completer.setVisible(False)
+
+    def _on_slash_command_selected(self, command: str):
+        """用户从弹出框中选择了一个斜杠命令"""
+        self.input_edit.insert_slash_completion(command)
+        self._slash_completer.setVisible(False)
+        # 执行命令 — 委托给 AITab 的 _execute_slash_command
+        try:
+            self._execute_slash_command(command)
+        except Exception as e:
+            print(f"[SlashCommand] 执行 /{command} 失败: {e}")
 
     # ---------- 工具执行状态（兼容旧 API）----------
 

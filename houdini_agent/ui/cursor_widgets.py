@@ -5493,6 +5493,154 @@ class NodeCompleterPopup(QtWidgets.QListWidget):
 
 
 # ============================================================
+# 斜杠命令弹出框
+# ============================================================
+
+# ── 斜杠命令注册表 ──
+# 每条: (command, icon, label_zh, label_en, description_zh, description_en, category)
+SLASH_COMMANDS = [
+    # ── 会话管理 ──
+    ("clear",     "🗑",  "清空对话",     "Clear Chat",      "清空当前对话历史",           "Clear current conversation",   "session"),
+    ("new",       "✨",  "新建会话",     "New Chat",         "创建一个新的对话",           "Create a new conversation",    "session"),
+    # ── 记忆系统 ──
+    ("memory",    "🧠",  "记忆状态",     "Memory Status",    "查看长期记忆统计和核心记忆", "View memory stats & core memories", "memory"),
+    ("remember",  "📌",  "记住偏好",     "Remember",         "将内容写入核心记忆",         "Save content to core memory",  "memory"),
+    ("forget",    "🧹",  "清除记忆",     "Forget",           "搜索并删除指定记忆",         "Search and delete a memory",   "memory"),
+    ("search_mem","🔍",  "搜索记忆",     "Search Memory",    "在长期记忆中搜索",           "Search long-term memory",      "memory"),
+    # ── Houdini 场景 ──
+    ("network",   "🌐",  "读取网络",     "Read Network",     "读取当前网络结构",           "Read current network structure","scene"),
+    ("selection", "👆",  "读取选中",     "Read Selection",   "读取当前选中节点信息",       "Read selected node info",      "scene"),
+    ("skills",    "⚡",  "技能列表",     "List Skills",      "列出所有可用 Skill",         "List all available skills",    "scene"),
+    # ── 工具 ──
+    ("status",    "📊",  "系统状态",     "System Status",    "查看记忆/成长/上下文统计",   "View memory/growth/context stats", "tool"),
+    ("export",    "💾",  "导出训练",     "Export Training",  "导出对话为训练数据",         "Export conversation as training data", "tool"),
+    ("image",     "🖼",  "附加图片",     "Attach Image",     "从文件选择图片附加到消息",   "Select image to attach",       "tool"),
+    ("help",      "❓",  "帮助",         "Help",             "显示所有可用斜杠命令",       "Show all available commands",   "tool"),
+]
+
+# 按分类分组的标题
+_SLASH_CATEGORY_LABELS = {
+    "session": ("── 会话 ──", "── Session ──"),
+    "memory":  ("── 记忆 ──", "── Memory ──"),
+    "scene":   ("── 场景 ──", "── Scene ──"),
+    "tool":    ("── 工具 ──", "── Tools ──"),
+}
+
+
+class SlashCommandPopup(QtWidgets.QListWidget):
+    """斜杠命令弹出窗 — 在输入 / 时显示可用命令"""
+
+    commandSelected = QtCore.Signal(str)  # 用户选中了一个命令名
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._flags_applied = False
+        self.setFixedWidth(300)
+        self.setMaximumHeight(320)
+        self.setObjectName("slashCompleter")
+        self.itemActivated.connect(self._on_item_activated)
+        self.setVisible(False)
+
+    def show_filtered(self, prefix: str, anchor_widget: QtWidgets.QWidget,
+                      cursor_rect, lang: str = 'zh'):
+        """根据前缀过滤并显示命令列表"""
+        if not self._flags_applied:
+            self._flags_applied = True
+            self.setWindowFlags(QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint)
+
+        self.clear()
+        lower_prefix = prefix.lower()
+        is_zh = (lang == 'zh')
+
+        # 按分类分组
+        last_cat = None
+        match_count = 0
+        for cmd, icon, lbl_zh, lbl_en, desc_zh, desc_en, cat in SLASH_COMMANDS:
+            label = lbl_zh if is_zh else lbl_en
+            desc = desc_zh if is_zh else desc_en
+            # 匹配命令名、标签、描述
+            if lower_prefix and not any(lower_prefix in s.lower() for s in (cmd, label, desc)):
+                continue
+            # 分类标题
+            if cat != last_cat:
+                last_cat = cat
+                cat_label = _SLASH_CATEGORY_LABELS.get(cat, ("──", "──"))
+                header_item = QtWidgets.QListWidgetItem(cat_label[0] if is_zh else cat_label[1])
+                header_item.setFlags(QtCore.Qt.NoItemFlags)  # 不可选
+                font = header_item.font()
+                font.setPointSize(max(7, font.pointSize() - 1))
+                header_item.setFont(font)
+                header_item.setForeground(QtGui.QColor(120, 130, 160))
+                self.addItem(header_item)
+            # 命令项
+            display_text = f"{icon}  /{cmd}    {desc}"
+            item = QtWidgets.QListWidgetItem(display_text)
+            item.setData(QtCore.Qt.UserRole, cmd)
+            self.addItem(item)
+            match_count += 1
+
+        if match_count == 0:
+            self.setVisible(False)
+            return
+
+        # 定位到光标下方
+        global_pos = anchor_widget.mapToGlobal(cursor_rect.bottomLeft())
+        self.move(global_pos.x(), global_pos.y() + 4)
+        # 动态调整高度
+        row_h = 24
+        total_h = min(320, (self.count()) * row_h + 12)
+        self.setFixedHeight(max(80, total_h))
+        self.setVisible(True)
+        # 选中第一个非标题项
+        for i in range(self.count()):
+            if self.item(i).flags() & QtCore.Qt.ItemIsSelectable:
+                self.setCurrentRow(i)
+                break
+
+    def _on_item_activated(self, item):
+        cmd = item.data(QtCore.Qt.UserRole)
+        if cmd:
+            self.commandSelected.emit(cmd)
+            self.setVisible(False)
+
+    def select_next(self):
+        """选中下一个可选项"""
+        row = self.currentRow()
+        for i in range(row + 1, self.count()):
+            if self.item(i).flags() & QtCore.Qt.ItemIsSelectable:
+                self.setCurrentRow(i)
+                return
+
+    def select_prev(self):
+        """选中上一个可选项"""
+        row = self.currentRow()
+        for i in range(row - 1, -1, -1):
+            if self.item(i).flags() & QtCore.Qt.ItemIsSelectable:
+                self.setCurrentRow(i)
+                return
+
+    def confirm_current(self) -> bool:
+        """确认当前选中项，返回是否成功"""
+        current = self.currentItem()
+        if current:
+            cmd = current.data(QtCore.Qt.UserRole)
+            if cmd:
+                self.commandSelected.emit(cmd)
+                self.setVisible(False)
+                return True
+        return False
+
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self.confirm_current()
+            return
+        elif event.key() == QtCore.Qt.Key_Escape:
+            self.setVisible(False)
+            return
+        super().keyPressEvent(event)
+
+
+# ============================================================
 # 输入区域
 # ============================================================
 
@@ -5507,6 +5655,7 @@ class ChatInput(QtWidgets.QPlainTextEdit):
     sendRequested = QtCore.Signal()
     imageDropped = QtCore.Signal(QtGui.QImage)  # 粘贴或拖拽图片时触发
     atTriggered = QtCore.Signal(str, QtCore.QRect)  # @ 触发补全: (当前前缀, 光标矩形)
+    slashTriggered = QtCore.Signal(str, QtCore.QRect)  # / 触发补全: (当前前缀, 光标矩形)
     
     _MIN_H = 44
     _MAX_H = 220
@@ -5552,16 +5701,25 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         # 使用 textChanged，并延迟到下一事件循环执行（确保布局先完成）
         self.textChanged.connect(self._schedule_adjust)
         self.textChanged.connect(self._check_at_trigger)
+        self.textChanged.connect(self._check_slash_trigger)
         # @ 补全状态
         self._at_active = False
         self._at_start_pos = -1
         self._completer_popup: 'NodeCompleterPopup | None' = None
+        # / 斜杠命令补全状态
+        self._slash_active = False
+        self._slash_start_pos = -1
+        self._slash_popup: 'SlashCommandPopup | None' = None
         # ★ IME 预编辑状态追踪
         self._ime_composing = False
     
     def set_completer_popup(self, popup: 'NodeCompleterPopup'):
         """设置节点补全弹出框引用，用于键盘导航和自动关闭"""
         self._completer_popup = popup
+
+    def set_slash_popup(self, popup: 'SlashCommandPopup'):
+        """设置斜杠命令弹出框引用"""
+        self._slash_popup = popup
     
     def _schedule_adjust(self):
         """延迟调整高度，确保文档布局已更新"""
@@ -5663,6 +5821,64 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         return (self._completer_popup is not None
                 and self._completer_popup.isVisible()
                 and self._completer_popup.count() > 0)
+
+    # ---- 斜杠命令补全 ----
+
+    def _check_slash_trigger(self):
+        """检测输入中的 / 字符，触发斜杠命令补全（仅在行首或纯 / 开头时触发）"""
+        cursor = self.textCursor()
+        pos = cursor.position()
+        text = self.toPlainText()
+
+        if not text or pos == 0:
+            if self._slash_active:
+                self._slash_active = False
+                self._hide_slash()
+            return
+
+        # 仅当 / 在文本最开头时触发（整个输入为 /xxx）
+        if not text.startswith('/'):
+            if self._slash_active:
+                self._slash_active = False
+                self._hide_slash()
+            return
+
+        # 提取 / 之后到光标位置的内容
+        prefix_after_slash = text[1:pos]
+        # 如果包含空格或换行，说明已超出命令名范围
+        if ' ' in prefix_after_slash or '\n' in prefix_after_slash:
+            if self._slash_active:
+                self._slash_active = False
+                self._hide_slash()
+            return
+
+        self._slash_active = True
+        self._slash_start_pos = 0
+        crect = self.cursorRect(cursor)
+        self.slashTriggered.emit(prefix_after_slash, crect)
+
+    def _hide_slash(self):
+        """隐藏斜杠命令弹出框"""
+        if self._slash_popup and self._slash_popup.isVisible():
+            self._slash_popup.setVisible(False)
+
+    def cancel_slash_completion(self):
+        """取消当前斜杠命令补全"""
+        self._slash_active = False
+        self._slash_start_pos = -1
+        self._hide_slash()
+
+    def insert_slash_completion(self, command: str):
+        """斜杠命令被选中后，清空输入框（命令将直接执行，不需要保留文字）"""
+        self.clear()
+        self._slash_active = False
+        self._slash_start_pos = -1
+
+    def _is_slash_visible(self) -> bool:
+        """斜杠命令弹出框是否可见"""
+        return (self._slash_popup is not None
+                and self._slash_popup.isVisible()
+                and self._slash_popup.count() > 0)
 
     def inputMethodQuery(self, query):
         """★ macOS IME 关键修复：为输入法提供光标位置和周围文本信息
@@ -5798,7 +6014,35 @@ class ChatInput(QtWidgets.QPlainTextEdit):
             # 补全活跃但弹窗不可见（如无匹配结果）：仍允许 Escape 取消
             self.cancel_at_completion()
             return
-        
+
+        # ── / 斜杠命令补全活跃时的键盘处理 ──
+        if self._slash_active and self._is_slash_visible():
+            popup = self._slash_popup
+
+            if key == QtCore.Qt.Key_Escape:
+                self.cancel_slash_completion()
+                return
+
+            if key == QtCore.Qt.Key_Up:
+                popup.select_prev()
+                return
+
+            if key == QtCore.Qt.Key_Down:
+                popup.select_next()
+                return
+
+            if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and not (event.modifiers() & QtCore.Qt.ShiftModifier):
+                if popup.confirm_current():
+                    return
+
+            if key == QtCore.Qt.Key_Tab:
+                if popup.confirm_current():
+                    return
+
+        elif self._slash_active and key == QtCore.Qt.Key_Escape:
+            self.cancel_slash_completion()
+            return
+
         # ── 常规键盘处理 ──
         if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             if event.modifiers() & QtCore.Qt.ShiftModifier:
@@ -5813,6 +6057,8 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         """点击文本区域时，如果补全弹窗可见则关闭"""
         if self._is_completer_visible():
             self.cancel_at_completion()
+        if self._is_slash_visible():
+            self.cancel_slash_completion()
         super().mousePressEvent(event)
 
     def focusInEvent(self, event):
@@ -5837,10 +6083,13 @@ class ChatInput(QtWidgets.QPlainTextEdit):
 
     def _check_focus_dismiss(self):
         """检查是否需要因失焦而关闭弹窗"""
-        if not self.hasFocus() and self._is_completer_visible():
-            # 检查弹窗本身是否获得焦点（ToolTip 窗口一般不获焦，但以防万一）
-            if self._completer_popup and not self._completer_popup.hasFocus():
-                self.cancel_at_completion()
+        if not self.hasFocus():
+            if self._is_completer_visible():
+                if self._completer_popup and not self._completer_popup.hasFocus():
+                    self.cancel_at_completion()
+            if self._is_slash_visible():
+                if self._slash_popup and not self._slash_popup.hasFocus():
+                    self.cancel_slash_completion()
 
     def resizeEvent(self, event):
         """窗口宽度变化时重新计算高度（自动换行可能改变行数）"""

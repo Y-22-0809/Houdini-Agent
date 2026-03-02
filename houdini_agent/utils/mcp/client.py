@@ -3331,6 +3331,8 @@ class HoudiniMCP:
         # PerfMon 性能分析
         "perf_start_profile": "_tool_perf_start_profile",
         "perf_stop_and_report": "_tool_perf_stop_and_report",
+        # 长期记忆主动搜索
+        "search_memory": "_tool_search_memory",
     }
 
     # Python 代码安全黑名单
@@ -3461,6 +3463,73 @@ class HoudiniMCP:
             print(f"[MCP Client] 工具执行异常: {traceback.format_exc()}")
             err = f"工具 {tool_name} 执行异常: {str(e)}"
             return {"success": False, "error": self._append_usage_hint(tool_name, err)}
+
+    # ========================================
+    # 长期记忆主动搜索
+    # ========================================
+
+    def _tool_search_memory(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """搜索长期记忆库 — 跨层级 chunk 检索"""
+        query = args.get("query", "")
+        print(f"[search_memory] 收到搜索请求: query={query!r}, args={args}")
+        if not query:
+            return {"success": False, "error": "query 参数不能为空"}
+
+        category = args.get("category")
+        top_k = min(max(args.get("top_k", 5), 1), 10)
+
+        try:
+            from ..memory_store import get_memory_store, ABSTRACTION_LEVELS
+            store = get_memory_store()
+            total = store.count_semantic()
+            print(f"[search_memory] 记忆库中有 {total} 条语义记忆")
+
+            results = store.search_all_levels(
+                query=query,
+                category=category,
+                top_k=top_k,
+                min_confidence=0.1,
+            )
+            print(f"[search_memory] 搜索结果: {len(results)} 条")
+
+            if not results:
+                return {
+                    "success": True,
+                    "count": 0,
+                    "memories": [],
+                    "message": f"未找到相关记忆（库中共 {total} 条语义记忆，min_confidence=0.1）",
+                }
+
+            memories = []
+            for rec, score in results:
+                level_name = ABSTRACTION_LEVELS.get(rec.abstraction_level, "unknown")
+                memories.append({
+                    "rule": rec.rule,
+                    "category": rec.category,
+                    "abstraction_level": rec.abstraction_level,
+                    "level_name": level_name,
+                    "confidence": round(rec.confidence, 2),
+                    "relevance": round(score, 3),
+                    "activation_count": rec.activation_count,
+                })
+
+            # 更新激活计数
+            for rec, _ in results:
+                try:
+                    store.increment_semantic_activation(rec.id)
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "count": len(memories),
+                "query": query,
+                "category_filter": category,
+                "memories": memories,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"记忆搜索失败: {str(e)}"}
 
     def _tool_unknown(self, tool_name: str) -> Dict[str, Any]:
         """处理未知工具名称，提供建议"""

@@ -1716,6 +1716,31 @@ QListWidget#nodeCompleter::item:hover {
 
 
 /* ============================================================
+   21b. SLASH COMMAND COMPLETER POPUP
+   ============================================================ */
+
+QListWidget#slashCompleter {
+    background: rgba(16,18,32,245);
+    color: #e2e8f0;
+    border: 1px solid rgba(139,92,246,80);
+    border-radius: 8px;
+    font-size: {FS_SM}px;
+    padding: 4px;
+}
+QListWidget#slashCompleter::item {
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+QListWidget#slashCompleter::item:selected {
+    background: rgba(139,92,246,100);
+    color: #ffffff;
+}
+QListWidget#slashCompleter::item:hover {
+    background: rgba(30,32,55,180);
+}
+
+
+/* ============================================================
    22. IMAGE PREVIEW DIALOG
    ============================================================ */
 
