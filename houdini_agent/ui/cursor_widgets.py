@@ -5526,10 +5526,28 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         self.setMinimumHeight(self._MIN_H)
         self.setMaximumHeight(self._MAX_H)
         
-        # ★ PySide2 IME 支持：显式启用输入法
-        # PySide2 在某些宿主环境（如 Houdini）中不会自动启用 IME，
-        # 导致中文/日文/韩文等输入法无法调起
+        # ★ PySide2 / PySide6 全平台 IME 支持（中文/日文/韩文）
+        # ------------------------------------------------------------------
+        # 问题背景：
+        #   PySide2 嵌入 Houdini 时，macOS / Windows 上输入法可能不激活。
+        #   macOS 的 NSTextInputClient 协议尤其依赖 inputMethodQuery 返回
+        #   正确的光标矩形/周围文本/光标位置等信息，否则 IME 候选窗口
+        #   无法定位甚至不会弹出。
+        # ------------------------------------------------------------------
+        # 1. 显式启用输入法
         self.setAttribute(QtCore.Qt.WA_InputMethodEnabled, True)
+        # 2. 显式设置焦点策略，确保 Tab/Click 都能获取焦点
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        # 3. 设置输入法提示：自由文本
+        try:
+            self.setInputMethodHints(QtCore.Qt.ImhNone)
+        except Exception:
+            pass  # 极少数 PySide2 版本不支持此调用
+        # 4. macOS 特有：确保焦点矩形可见（某些嵌入场景下默认关闭）
+        try:
+            self.setAttribute(QtCore.Qt.WA_MacShowFocusRect, True)
+        except Exception:
+            pass
         
         # 使用 textChanged，并延迟到下一事件循环执行（确保布局先完成）
         self.textChanged.connect(self._schedule_adjust)
@@ -5646,8 +5664,50 @@ class ChatInput(QtWidgets.QPlainTextEdit):
                 and self._completer_popup.isVisible()
                 and self._completer_popup.count() > 0)
 
+    def inputMethodQuery(self, query):
+        """★ macOS IME 关键修复：为输入法提供光标位置和周围文本信息
+        
+        macOS 的输入法框架（NSTextInputClient 协议）通过此方法查询：
+          - ImEnabled       → 此控件是否接受输入法输入
+          - ImCursorRectangle → 光标在控件中的矩形区域（用于定位候选框）
+          - ImSurroundingText → 光标周围的文本（辅助联想/智能选词）
+          - ImCursorPosition  → 光标在周围文本中的位置
+          - ImFont           → 当前字体信息
+          - ImHints          → 输入法提示
+        
+        如果不覆写此方法，PySide2 嵌入 Houdini 时（尤其 macOS）
+        可能返回错误值或零矩形，导致 IME 不激活或候选框位置异常。
+        """
+        qt = QtCore.Qt
+        if query == qt.ImEnabled:
+            return True
+        if query == qt.ImCursorRectangle:
+            # 返回光标在控件坐标系中的矩形
+            cursor_rect = self.cursorRect()
+            return cursor_rect
+        if query == qt.ImFont:
+            return self.font()
+        if query == qt.ImCursorPosition:
+            tc = self.textCursor()
+            block = tc.block()
+            return tc.position() - block.position()
+        if query == qt.ImSurroundingText:
+            tc = self.textCursor()
+            block = tc.block()
+            return block.text()
+        if query == qt.ImCurrentSelection:
+            tc = self.textCursor()
+            return tc.selectedText()
+        try:
+            if query == qt.ImHints:
+                return qt.ImhNone
+        except Exception:
+            pass
+        # 其他查询交给父类
+        return super().inputMethodQuery(query)
+
     def inputMethodEvent(self, event):
-        """★ IME 输入法事件处理（中文/日文/韩文等）
+        """★ IME 输入法事件处理（中文/日文/韩文等）— 全平台增强版
         
         PySide2 在 Houdini 环境下需要显式处理 inputMethodEvent，
         否则中文输入法的预编辑（composing）和提交（commit）可能无法正常工作。
@@ -5656,6 +5716,10 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         1. 用户开始输入拼音 → preeditString 不为空（composing 状态）
         2. 用户选择候选词 → commitString 不为空，preeditString 清空
         3. 用户按 Esc 取消 → preeditString 清空，commitString 为空
+        
+        macOS 特别注意：
+        - 某些 PySide2 版本在 macOS 上不会正确传递 commit 事件
+        - 需要确保 commitString 被手动插入文本光标
         """
         preedit = event.preeditString()
         commit = event.commitString()
@@ -5663,8 +5727,23 @@ class ChatInput(QtWidgets.QPlainTextEdit):
         # 更新 composing 状态
         self._ime_composing = bool(preedit)
         
-        # 交给父类处理实际的文本插入
+        # 先让父类处理（标准路径）
         super().inputMethodEvent(event)
+        
+        # macOS PySide2 修补：如果父类没有正确处理 commitString，
+        # 手动将已确认的文字插入光标位置。
+        # 通过检查：如果有 commit 文字，但当前文本中找不到它（说明父类漏了），
+        # 则手动插入。
+        if commit and not preedit:
+            tc = self.textCursor()
+            current_text = self.toPlainText()
+            # 简单检查：如果 commit 的文字在光标位置之前不存在，手动插入
+            # 注意：这是一个保守检查，只有在父类确实没有处理时才介入
+            pos = tc.position()
+            before = current_text[:pos]
+            if not before.endswith(commit):
+                tc.insertText(commit)
+                self.setTextCursor(tc)
     
     def keyPressEvent(self, event):
         key = event.key()
@@ -5736,8 +5815,22 @@ class ChatInput(QtWidgets.QPlainTextEdit):
             self.cancel_at_completion()
         super().mousePressEvent(event)
 
+    def focusInEvent(self, event):
+        """★ 获焦时确保 IME 正确激活（macOS 关键修复）
+        
+        macOS 上，当 QPlainTextEdit 嵌入 Houdini 等宿主应用时，
+        获焦时 IME 可能不会自动激活。通过显式调用 update() 和
+        重新设置 WA_InputMethodEnabled，强制系统重新检查 IME 状态。
+        """
+        super().focusInEvent(event)
+        # 确保 IME 标志仍然有效
+        self.setAttribute(QtCore.Qt.WA_InputMethodEnabled, True)
+        # 触发控件重绘，间接通知系统重新查询 inputMethodQuery
+        self.update()
+
     def focusOutEvent(self, event):
-        """失焦时关闭补全弹窗"""
+        """失焦时关闭补全弹窗并重置 IME 状态"""
+        self._ime_composing = False  # 重置 IME 状态
         # 延迟关闭：如果焦点转移到弹窗本身（用户点击弹窗），不关闭
         QtCore.QTimer.singleShot(100, self._check_focus_dismiss)
         super().focusOutEvent(event)
