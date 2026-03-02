@@ -4014,14 +4014,25 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         parent_path = snapshot.get("parent_path", "")
         node_type = snapshot.get("node_type", "")
         node_name = snapshot.get("node_name", "")
+        has_children_snapshot = bool(snapshot.get("children"))
         
         parent = _parent_override or hou.node(parent_path)
         if parent is None:
             return None
         
         # 1) 创建节点
+        # ★ 如果快照中有子节点数据，必须禁止自动创建默认子节点
+        #   否则 geo 等容器节点会自动生成 file1 等默认子节点，
+        #   与我们递归恢复的原始子节点冲突（名称冲突/多余节点）
         try:
-            new_node = parent.createNode(node_type, node_name)
+            if has_children_snapshot:
+                new_node = parent.createNode(
+                    node_type, node_name,
+                    run_init_scripts=False,
+                    load_contents=False,
+                )
+            else:
+                new_node = parent.createNode(node_type, node_name)
         except Exception:
             return None
         
@@ -4050,14 +4061,25 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             except Exception:
                 continue
         
-        # 4) ★ 递归重建子节点
+        # 4) ★ 清空可能残留的默认子节点（以防万一，确保干净恢复）
+        if has_children_snapshot:
+            try:
+                for default_child in list(new_node.children()):
+                    try:
+                        default_child.destroy()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        
+        # 5) ★ 递归重建子节点
         children_map: dict = {}  # name → hou.Node  用于稍后恢复内部连接
         for child_snap in snapshot.get("children", []):
             child_node = self._restore_node_from_snapshot(hou, child_snap, _parent_override=new_node)
             if child_node:
                 children_map[child_node.name()] = child_node
         
-        # 5) ★ 恢复子节点间的内部连接
+        # 6) ★ 恢复子节点间的内部连接
         for iconn in snapshot.get("internal_connections", []):
             try:
                 src_node = children_map.get(iconn["src_name"])
@@ -4067,7 +4089,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             except Exception:
                 continue
         
-        # 6) 恢复外部输入连接（仅顶层节点 — 子节点的外部连接由父级调用处理）
+        # 7) 恢复外部输入连接（仅顶层节点 — 子节点的外部连接由父级调用处理）
         if _parent_override is None:
             for conn in snapshot.get("input_connections", []):
                 try:
@@ -4077,7 +4099,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 except Exception:
                     continue
         
-        # 7) 恢复外部输出连接（仅顶层节点）
+        # 8) 恢复外部输出连接（仅顶层节点）
         if _parent_override is None:
             for conn in snapshot.get("output_connections", []):
                 try:
@@ -4087,7 +4109,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 except Exception:
                     continue
         
-        # 8) 恢复标志位
+        # 9) 恢复标志位
         try:
             if snapshot.get("display_flag") and hasattr(new_node, 'setDisplayFlag'):
                 new_node.setDisplayFlag(True)
@@ -4214,8 +4236,18 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         for label, op_type, paths, snapshot in reversed(self._pending_ops):
             if label._decided:
                 continue
-            # 触发单条撤销
-            label._on_undo()
+            # ★ 直接执行撤销逻辑，不通过 label._on_undo() 的信号
+            #   因为 label._on_undo() 会 emit undoRequested 信号，
+            #   而该信号已连接了 _undo_node_operation，会导致双重执行。
+            #   这里只更新 label 的 UI 状态，然后手动执行一次撤销。
+            label._decided = True
+            label._undo_btn.setVisible(False)
+            label._keep_btn.setVisible(False)
+            label._status_label.setText(tr('status.undone'))
+            label._status_label.setProperty("state", "undone")
+            label._status_label.style().unpolish(label._status_label)
+            label._status_label.style().polish(label._status_label)
+            label._status_label.setVisible(True)
             self._undo_node_operation(op_type, paths, snapshot)
             count += 1
         
