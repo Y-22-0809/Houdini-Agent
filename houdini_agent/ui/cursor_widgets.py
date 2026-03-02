@@ -6576,131 +6576,171 @@ class PluginManagerDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setObjectName("pluginManagerDlg")
         self.setWindowTitle(tr('plugin.manager_title'))
-        self.setMinimumSize(540, 420)
-        self.resize(580, 460)
+        self.setMinimumSize(620, 480)
+        self.resize(660, 520)
 
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(8)
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # 标题
-        title = QtWidgets.QLabel(tr('plugin.manager_title'))
-        title.setObjectName("pluginManagerTitle")
-        layout.addWidget(title)
+        # ═══════ Header 标题栏 ═══════
+        header = QtWidgets.QFrame()
+        header.setObjectName("pmHeader")
+        header.setFixedHeight(44)
+        header_lay = QtWidgets.QHBoxLayout(header)
+        header_lay.setContentsMargins(16, 0, 16, 0)
+        header_lay.setSpacing(8)
 
-        # 分隔线
-        sep = QtWidgets.QFrame()
-        sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setStyleSheet("color: rgba(180,160,130,12);")
-        layout.addWidget(sep)
+        title_lbl = QtWidgets.QLabel(f"🔌  {tr('plugin.manager_title')}")
+        title_lbl.setObjectName("pmTitle")
+        header_lay.addWidget(title_lbl)
+        header_lay.addStretch()
 
-        # ★ Tab Widget — Plugins / Tools / Skills
+        self._stats_label = QtWidgets.QLabel("")
+        self._stats_label.setObjectName("pmStatsLabel")
+        header_lay.addWidget(self._stats_label)
+
+        root.addWidget(header)
+
+        # ═══════ Tab Bar (underline style) ═══════
         self._tabs = QtWidgets.QTabWidget()
-        self._tabs.setObjectName("pluginManagerTabs")
-        layout.addWidget(self._tabs, 1)
+        self._tabs.setObjectName("pmTabs")
+        self._tabs.setDocumentMode(True)  # 去掉 pane 边框, 更现代
 
         # ── Tab 1: Plugins ──
         plugins_page = QtWidgets.QWidget()
+        plugins_page.setObjectName("pmTabPage")
         plugins_lay = QtWidgets.QVBoxLayout(plugins_page)
-        plugins_lay.setContentsMargins(0, 6, 0, 0)
-        plugins_lay.setSpacing(4)
+        plugins_lay.setContentsMargins(12, 10, 12, 6)
+        plugins_lay.setSpacing(6)
 
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setObjectName("pluginListScroll")
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        scroll.setObjectName("pmScroll")
         self._list_container = QtWidgets.QWidget()
+        self._list_container.setObjectName("pmScrollInner")
         self._list_layout = QtWidgets.QVBoxLayout(self._list_container)
         self._list_layout.setContentsMargins(0, 0, 0, 0)
-        self._list_layout.setSpacing(4)
+        self._list_layout.setSpacing(6)
         scroll.setWidget(self._list_container)
         plugins_lay.addWidget(scroll, 1)
 
-        self._tabs.addTab(plugins_page, tr('plugin.tab_plugins'))
+        self._tabs.addTab(plugins_page, f"  {tr('plugin.tab_plugins')}  ")
 
         # ── Tab 2: Tools ──
         tools_page = QtWidgets.QWidget()
+        tools_page.setObjectName("pmTabPage")
         tools_lay = QtWidgets.QVBoxLayout(tools_page)
-        tools_lay.setContentsMargins(0, 6, 0, 0)
-        tools_lay.setSpacing(4)
+        tools_lay.setContentsMargins(12, 10, 12, 6)
+        tools_lay.setSpacing(6)
+
+        # 搜索框
+        self._tools_search = QtWidgets.QLineEdit()
+        self._tools_search.setObjectName("pmSearchEdit")
+        self._tools_search.setPlaceholderText(tr('plugin.search_tools'))
+        self._tools_search.setClearButtonEnabled(True)
+        self._tools_search.textChanged.connect(self._filter_tools)
+        tools_lay.addWidget(self._tools_search)
 
         tools_scroll = QtWidgets.QScrollArea()
         tools_scroll.setWidgetResizable(True)
-        tools_scroll.setObjectName("toolListScroll")
-        tools_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        tools_scroll.setObjectName("pmScroll")
         self._tools_container = QtWidgets.QWidget()
+        self._tools_container.setObjectName("pmScrollInner")
         self._tools_layout = QtWidgets.QVBoxLayout(self._tools_container)
         self._tools_layout.setContentsMargins(0, 0, 0, 0)
-        self._tools_layout.setSpacing(2)
+        self._tools_layout.setSpacing(4)
         tools_scroll.setWidget(self._tools_container)
         tools_lay.addWidget(tools_scroll, 1)
 
-        self._tabs.addTab(tools_page, tr('plugin.tab_tools'))
+        self._tabs.addTab(tools_page, f"  {tr('plugin.tab_tools')}  ")
 
         # ── Tab 3: Skills ──
         skills_page = QtWidgets.QWidget()
+        skills_page.setObjectName("pmTabPage")
         skills_lay = QtWidgets.QVBoxLayout(skills_page)
-        skills_lay.setContentsMargins(0, 6, 0, 0)
-        skills_lay.setSpacing(4)
+        skills_lay.setContentsMargins(12, 10, 12, 6)
+        skills_lay.setSpacing(6)
 
         skills_scroll = QtWidgets.QScrollArea()
         skills_scroll.setWidgetResizable(True)
-        skills_scroll.setObjectName("skillListScroll")
-        skills_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        skills_scroll.setObjectName("pmScroll")
         self._skills_container = QtWidgets.QWidget()
+        self._skills_container.setObjectName("pmScrollInner")
         self._skills_layout = QtWidgets.QVBoxLayout(self._skills_container)
         self._skills_layout.setContentsMargins(0, 0, 0, 0)
-        self._skills_layout.setSpacing(2)
+        self._skills_layout.setSpacing(6)
         skills_scroll.setWidget(self._skills_container)
         skills_lay.addWidget(skills_scroll, 1)
 
         # Skill 目录配置
-        skill_dir_row = QtWidgets.QHBoxLayout()
-        skill_dir_row.setSpacing(6)
+        skill_dir_frame = QtWidgets.QFrame()
+        skill_dir_frame.setObjectName("pmSkillDirFrame")
+        skill_dir_lay = QtWidgets.QHBoxLayout(skill_dir_frame)
+        skill_dir_lay.setContentsMargins(10, 6, 10, 6)
+        skill_dir_lay.setSpacing(8)
+        skill_dir_icon = QtWidgets.QLabel("📁")
+        skill_dir_icon.setStyleSheet("background: transparent; font-size: 13px;")
+        skill_dir_lay.addWidget(skill_dir_icon)
         skill_dir_lbl = QtWidgets.QLabel(tr('plugin.skill_dir_label'))
-        skill_dir_lbl.setStyleSheet("color: #8a7e6e; font-size: 11px; background: transparent;")
-        skill_dir_row.addWidget(skill_dir_lbl)
+        skill_dir_lbl.setObjectName("pmSubLabel")
+        skill_dir_lay.addWidget(skill_dir_lbl)
         self._skill_dir_edit = QtWidgets.QLineEdit()
-        self._skill_dir_edit.setObjectName("skillDirEdit")
+        self._skill_dir_edit.setObjectName("pmPathEdit")
         self._skill_dir_edit.setPlaceholderText(tr('plugin.skill_dir_placeholder'))
         self._skill_dir_edit.setReadOnly(True)
-        skill_dir_row.addWidget(self._skill_dir_edit, 1)
-        btn_browse_skill = QtWidgets.QPushButton("📂")
-        btn_browse_skill.setObjectName("pluginBtnSmall")
-        btn_browse_skill.setFixedSize(26, 26)
+        skill_dir_lay.addWidget(self._skill_dir_edit, 1)
+        btn_browse_skill = QtWidgets.QPushButton(tr('plugin.skill_dir_browse'))
+        btn_browse_skill.setObjectName("pmBtnSecondary")
         btn_browse_skill.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_browse_skill.setToolTip(tr('plugin.skill_dir_browse'))
         btn_browse_skill.clicked.connect(self._browse_skill_dir)
-        skill_dir_row.addWidget(btn_browse_skill)
-        skills_lay.addLayout(skill_dir_row)
+        skill_dir_lay.addWidget(btn_browse_skill)
+        skills_lay.addWidget(skill_dir_frame)
 
-        self._tabs.addTab(skills_page, tr('plugin.tab_skills'))
+        self._tabs.addTab(skills_page, f"  {tr('plugin.tab_skills')}  ")
 
-        # ── 底部按钮栏 ──
-        bottom = QtWidgets.QHBoxLayout()
-        bottom.setSpacing(8)
+        root.addWidget(self._tabs, 1)
 
-        btn_open_dir = QtWidgets.QPushButton(tr('plugin.open_folder'))
-        btn_open_dir.setObjectName("pluginBtn")
+        # ═══════ Footer 底部栏 ═══════
+        footer = QtWidgets.QFrame()
+        footer.setObjectName("pmFooter")
+        footer.setFixedHeight(42)
+        footer_lay = QtWidgets.QHBoxLayout(footer)
+        footer_lay.setContentsMargins(14, 0, 14, 0)
+        footer_lay.setSpacing(8)
+
+        btn_open_dir = QtWidgets.QPushButton(f"📂  {tr('plugin.open_folder')}")
+        btn_open_dir.setObjectName("pmFooterBtn")
         btn_open_dir.setCursor(QtCore.Qt.PointingHandCursor)
         btn_open_dir.clicked.connect(self._open_plugins_dir)
-        bottom.addWidget(btn_open_dir)
+        footer_lay.addWidget(btn_open_dir)
 
-        bottom.addStretch()
+        footer_lay.addStretch()
 
-        btn_reload_all = QtWidgets.QPushButton(tr('plugin.reload_all'))
-        btn_reload_all.setObjectName("pluginBtnPrimary")
+        btn_reload_all = QtWidgets.QPushButton(f"↻  {tr('plugin.reload_all')}")
+        btn_reload_all.setObjectName("pmBtnPrimary")
         btn_reload_all.setCursor(QtCore.Qt.PointingHandCursor)
         btn_reload_all.clicked.connect(self._reload_all)
-        bottom.addWidget(btn_reload_all)
+        footer_lay.addWidget(btn_reload_all)
 
-        layout.addLayout(bottom)
+        root.addWidget(footer)
 
         # Tab 切换刷新
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
         # 加载插件列表
         self._refresh_list()
+        self._update_stats()
+
+    def _update_stats(self):
+        """更新 header 统计标签"""
+        try:
+            from ..utils.hooks import list_plugins
+            plugins = list_plugins()
+            enabled = sum(1 for p in plugins if p.get("_enabled"))
+            self._stats_label.setText(f"{enabled}/{len(plugins)} {tr('plugin.stats_active')}")
+        except Exception:
+            self._stats_label.setText("")
 
     def _refresh_list(self):
         """刷新插件列表"""
@@ -6715,55 +6755,115 @@ class PluginManagerDialog(QtWidgets.QDialog):
             plugins = list_plugins()
         except Exception as e:
             lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
-            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
+            lbl.setObjectName("pmErrorLabel")
             self._list_layout.addWidget(lbl)
             self._list_layout.addStretch()
             return
 
         if not plugins:
-            lbl = QtWidgets.QLabel(tr('plugin.no_plugins'))
-            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
-            lbl.setAlignment(QtCore.Qt.AlignCenter)
-            self._list_layout.addWidget(lbl)
+            # 空状态 — 漂亮的引导提示
+            empty_frame = QtWidgets.QFrame()
+            empty_frame.setObjectName("pmEmptyState")
+            ev = QtWidgets.QVBoxLayout(empty_frame)
+            ev.setContentsMargins(20, 40, 20, 40)
+            ev.setSpacing(10)
+            ev.setAlignment(QtCore.Qt.AlignCenter)
+
+            icon_lbl = QtWidgets.QLabel("🔌")
+            icon_lbl.setStyleSheet("font-size: 28px; background: transparent;")
+            icon_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            ev.addWidget(icon_lbl)
+
+            hint1 = QtWidgets.QLabel(tr('plugin.empty_title'))
+            hint1.setObjectName("pmEmptyTitle")
+            hint1.setAlignment(QtCore.Qt.AlignCenter)
+            ev.addWidget(hint1)
+
+            hint2 = QtWidgets.QLabel(tr('plugin.empty_hint'))
+            hint2.setObjectName("pmEmptyHint")
+            hint2.setAlignment(QtCore.Qt.AlignCenter)
+            hint2.setWordWrap(True)
+            ev.addWidget(hint2)
+
+            self._list_layout.addWidget(empty_frame)
         else:
             for info in plugins:
                 row = self._create_plugin_row(info)
                 self._list_layout.addWidget(row)
 
         self._list_layout.addStretch()
+        self._update_stats()
 
     def _create_plugin_row(self, info: dict) -> QtWidgets.QWidget:
-        """创建单个插件行"""
+        """创建单个插件行（卡片式）"""
         row = QtWidgets.QFrame()
-        row.setObjectName("pluginRow")
+        row.setObjectName("pmCard")
 
         h = QtWidgets.QHBoxLayout(row)
-        h.setContentsMargins(10, 8, 10, 8)
-        h.setSpacing(8)
+        h.setContentsMargins(12, 10, 12, 10)
+        h.setSpacing(10)
 
-        # 左侧：名称 + 描述
+        # 状态指示灯
+        enabled = info.get("_enabled", False)
+        dot = QtWidgets.QLabel("●")
+        dot.setFixedWidth(12)
+        dot.setStyleSheet(
+            f"color: {'#6ecf72' if enabled else '#5a5040'}; "
+            f"font-size: 8px; background: transparent;"
+        )
+        dot.setAlignment(QtCore.Qt.AlignCenter)
+        h.addWidget(dot)
+
+        # 左侧：名称 + 元信息
         left = QtWidgets.QVBoxLayout()
-        left.setSpacing(2)
+        left.setSpacing(3)
 
         name = info.get("name", "Unknown")
         version = info.get("version", "")
         author = info.get("author", "")
-        enabled = info.get("_enabled", False)
 
-        name_lbl = QtWidgets.QLabel(f"<b>{name}</b>  <span style='color:#8a7e6e'>v{version}</span>")
-        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 13px;")
+        name_lbl = QtWidgets.QLabel(
+            f"<span style='font-weight:600; color:#e0d4c0'>{name}</span>"
+            f"  <span style='color:#7a6e5e; font-size:10px'>v{version}</span>"
+        )
+        name_lbl.setObjectName("pmCardName")
         left.addWidget(name_lbl)
 
         desc = info.get("description", "")
         if author:
-            desc = f"by {author}  •  {desc}" if desc else f"by {author}"
+            desc = f"by {author}  ·  {desc}" if desc else f"by {author}"
         if desc:
             desc_lbl = QtWidgets.QLabel(desc)
-            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 11px;")
+            desc_lbl.setObjectName("pmCardDesc")
             desc_lbl.setWordWrap(True)
             left.addWidget(desc_lbl)
 
         h.addLayout(left, 1)
+
+        # 操作按钮组
+        actions = QtWidgets.QHBoxLayout()
+        actions.setSpacing(4)
+
+        # 设置按钮（仅有 settings 时显示）
+        if info.get("settings"):
+            btn_settings = QtWidgets.QPushButton("⚙")
+            btn_settings.setObjectName("pmIconBtn")
+            btn_settings.setFixedSize(28, 28)
+            btn_settings.setCursor(QtCore.Qt.PointingHandCursor)
+            btn_settings.setToolTip(tr('plugin.settings'))
+            btn_settings.clicked.connect(
+                lambda checked=False, n=name, i=info: self._open_settings(n, i))
+            actions.addWidget(btn_settings)
+
+        # 重载按钮
+        btn_reload = QtWidgets.QPushButton("↻")
+        btn_reload.setObjectName("pmIconBtn")
+        btn_reload.setFixedSize(28, 28)
+        btn_reload.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_reload.setToolTip(tr('plugin.reload'))
+        btn_reload.clicked.connect(
+            lambda checked=False, n=name: self._on_reload(n))
+        actions.addWidget(btn_reload)
 
         # 启用/禁用开关
         toggle = QtWidgets.QCheckBox()
@@ -6771,28 +6871,9 @@ class PluginManagerDialog(QtWidgets.QDialog):
         toggle.setToolTip(tr('plugin.toggle_tip'))
         toggle.stateChanged.connect(
             lambda state, n=name: self._on_toggle(n, state == QtCore.Qt.Checked))
-        h.addWidget(toggle)
+        actions.addWidget(toggle)
 
-        # 设置按钮（仅有 settings 时显示）
-        if info.get("settings"):
-            btn_settings = QtWidgets.QPushButton("⚙")
-            btn_settings.setObjectName("pluginBtnSmall")
-            btn_settings.setFixedSize(26, 26)
-            btn_settings.setCursor(QtCore.Qt.PointingHandCursor)
-            btn_settings.setToolTip(tr('plugin.settings'))
-            btn_settings.clicked.connect(
-                lambda checked=False, n=name, i=info: self._open_settings(n, i))
-            h.addWidget(btn_settings)
-
-        # 重载按钮
-        btn_reload = QtWidgets.QPushButton("↻")
-        btn_reload.setObjectName("pluginBtnSmall")
-        btn_reload.setFixedSize(26, 26)
-        btn_reload.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_reload.setToolTip(tr('plugin.reload'))
-        btn_reload.clicked.connect(
-            lambda checked=False, n=name: self._on_reload(n))
-        h.addWidget(btn_reload)
+        h.addLayout(actions)
 
         return row
 
@@ -6824,6 +6905,12 @@ class PluginManagerDialog(QtWidgets.QDialog):
             from ..utils.hooks import reload_all_plugins
             reload_all_plugins()
             self._refresh_list()
+            # 如果当前在 Tools/Skills tab, 也刷新
+            idx = self._tabs.currentIndex()
+            if idx == 1:
+                self._refresh_tools_list()
+            elif idx == 2:
+                self._refresh_skills_list()
             self.pluginStateChanged.emit()
         except Exception as e:
             print(f"[PluginManager] Reload all error: {e}")
@@ -6852,6 +6939,23 @@ class PluginManagerDialog(QtWidgets.QDialog):
         elif index == 2:
             self._refresh_skills_list()
 
+    def _filter_tools(self, text: str):
+        """搜索框过滤工具列表"""
+        text = text.strip().lower()
+        for i in range(self._tools_layout.count()):
+            item = self._tools_layout.itemAt(i)
+            w = item.widget() if item else None
+            if w is None:
+                continue
+            if w.objectName() == "pmCard":
+                tool_name = w.property("toolName") or ""
+                tool_desc = w.property("toolDesc") or ""
+                visible = (not text) or text in tool_name.lower() or text in tool_desc.lower()
+                w.setVisible(visible)
+            elif w.objectName() == "pmGroupHeader":
+                # 组标题: 如果搜索框有内容则隐藏组标题
+                w.setVisible(not text)
+
     # ---------- Tools Tab ----------
 
     def _refresh_tools_list(self):
@@ -6867,14 +6971,14 @@ class PluginManagerDialog(QtWidgets.QDialog):
             tools = reg.list_all()
         except Exception as e:
             lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
-            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
+            lbl.setObjectName("pmErrorLabel")
             self._tools_layout.addWidget(lbl)
             self._tools_layout.addStretch()
             return
 
         if not tools:
             lbl = QtWidgets.QLabel(tr('plugin.no_tools'))
-            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
+            lbl.setObjectName("pmEmptyHint")
             lbl.setAlignment(QtCore.Qt.AlignCenter)
             self._tools_layout.addWidget(lbl)
         else:
@@ -6884,24 +6988,32 @@ class PluginManagerDialog(QtWidgets.QDialog):
                 source = t.get("source", "core")
                 groups.setdefault(source, []).append(t)
 
+            source_icons = {
+                "core": "🔧",
+                "skill": "🧠",
+                "plugin": "🔌",
+                "user": "👤",
+                "user_skill": "📐",
+            }
             source_labels = {
-                "core": "🔧 Core Tools",
-                "skill": "🧠 Skills",
-                "plugin": "🔌 Plugin Tools",
-                "user": "👤 User Tools",
+                "core": tr('plugin.group_core'),
+                "skill": tr('plugin.group_skill'),
+                "plugin": tr('plugin.group_plugin'),
+                "user": tr('plugin.group_user'),
+                "user_skill": tr('plugin.group_user_skill'),
             }
 
-            for source in ("core", "skill", "plugin", "user"):
+            for source in ("core", "skill", "user_skill", "plugin", "user"):
                 items = groups.get(source, [])
                 if not items:
                     continue
 
                 # 组标题
-                group_lbl = QtWidgets.QLabel(source_labels.get(source, source))
-                group_lbl.setStyleSheet(
-                    "color: #b4a082; font-size: 12px; font-weight: bold; "
-                    "padding: 6px 4px 2px; background: transparent;"
+                group_lbl = QtWidgets.QLabel(
+                    f"{source_icons.get(source, '•')}  {source_labels.get(source, source)}"
+                    f"  ({len(items)})"
                 )
+                group_lbl.setObjectName("pmGroupHeader")
                 self._tools_layout.addWidget(group_lbl)
 
                 for t in items:
@@ -6911,38 +7023,51 @@ class PluginManagerDialog(QtWidgets.QDialog):
         self._tools_layout.addStretch()
 
     def _create_tool_row(self, info: dict) -> QtWidgets.QWidget:
-        """创建单个工具行"""
+        """创建单个工具行（紧凑卡片）"""
         row = QtWidgets.QFrame()
-        row.setObjectName("pluginRow")
-
-        h = QtWidgets.QHBoxLayout(row)
-        h.setContentsMargins(10, 4, 10, 4)
-        h.setSpacing(6)
+        row.setObjectName("pmCard")
 
         name = info.get("name", "")
-        desc = info.get("description", "")[:80]
+        desc = info.get("description", "")[:100]
         enabled = info.get("enabled", True)
         modes = info.get("modes", [])
         tags = info.get("tags", [])
 
-        left = QtWidgets.QVBoxLayout()
-        left.setSpacing(1)
+        # 存储属性用于搜索过滤
+        row.setProperty("toolName", name)
+        row.setProperty("toolDesc", desc)
 
-        name_lbl = QtWidgets.QLabel(f"<b>{name}</b>")
-        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 12px;")
+        h = QtWidgets.QHBoxLayout(row)
+        h.setContentsMargins(12, 6, 12, 6)
+        h.setSpacing(8)
+
+        left = QtWidgets.QVBoxLayout()
+        left.setSpacing(2)
+
+        name_lbl = QtWidgets.QLabel(f"<span style='font-weight:600; color:#e0d4c0'>{name}</span>")
+        name_lbl.setObjectName("pmCardName")
         left.addWidget(name_lbl)
 
         if desc:
             desc_lbl = QtWidgets.QLabel(desc)
-            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 10px;")
+            desc_lbl.setObjectName("pmCardDesc")
             desc_lbl.setWordWrap(True)
             left.addWidget(desc_lbl)
 
-        if modes:
-            mode_str = ", ".join(modes)
-            mode_lbl = QtWidgets.QLabel(f"modes: {mode_str}")
-            mode_lbl.setStyleSheet("color: #6e6454; background: transparent; font-size: 9px;")
-            left.addWidget(mode_lbl)
+        # 标签栏 (modes + tags)
+        if modes or tags:
+            tag_row = QtWidgets.QHBoxLayout()
+            tag_row.setSpacing(4)
+            for m in modes[:3]:  # 最多显示 3 个 mode 标签
+                tag = QtWidgets.QLabel(m)
+                tag.setObjectName("pmTagBadge")
+                tag_row.addWidget(tag)
+            for t_str in tags[:2]:
+                tag = QtWidgets.QLabel(t_str)
+                tag.setObjectName("pmTagBadgeAlt")
+                tag_row.addWidget(tag)
+            tag_row.addStretch()
+            left.addLayout(tag_row)
 
         h.addLayout(left, 1)
 
@@ -6980,16 +7105,31 @@ class PluginManagerDialog(QtWidgets.QDialog):
             skills = list_skills()
         except Exception as e:
             lbl = QtWidgets.QLabel(f"⚠ {tr('plugin.load_error')}: {e}")
-            lbl.setStyleSheet("color: #d4897a; padding: 12px; background: transparent;")
+            lbl.setObjectName("pmErrorLabel")
             self._skills_layout.addWidget(lbl)
             self._skills_layout.addStretch()
             return
 
         if not skills:
-            lbl = QtWidgets.QLabel(tr('plugin.no_skills'))
-            lbl.setStyleSheet("color: #8a7e6e; padding: 20px; background: transparent;")
-            lbl.setAlignment(QtCore.Qt.AlignCenter)
-            self._skills_layout.addWidget(lbl)
+            # 空状态
+            empty_frame = QtWidgets.QFrame()
+            empty_frame.setObjectName("pmEmptyState")
+            ev = QtWidgets.QVBoxLayout(empty_frame)
+            ev.setContentsMargins(20, 40, 20, 40)
+            ev.setSpacing(10)
+            ev.setAlignment(QtCore.Qt.AlignCenter)
+
+            icon_lbl = QtWidgets.QLabel("🧠")
+            icon_lbl.setStyleSheet("font-size: 28px; background: transparent;")
+            icon_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            ev.addWidget(icon_lbl)
+
+            hint_lbl = QtWidgets.QLabel(tr('plugin.no_skills'))
+            hint_lbl.setObjectName("pmEmptyHint")
+            hint_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            ev.addWidget(hint_lbl)
+
+            self._skills_layout.addWidget(empty_frame)
         else:
             for s in skills:
                 row = self._create_skill_row(s)
@@ -7007,35 +7147,49 @@ class PluginManagerDialog(QtWidgets.QDialog):
             pass
 
     def _create_skill_row(self, info: dict) -> QtWidgets.QWidget:
-        """创建单个 Skill 行"""
+        """创建单个 Skill 行（卡片式）"""
         row = QtWidgets.QFrame()
-        row.setObjectName("pluginRow")
+        row.setObjectName("pmCard")
 
         h = QtWidgets.QHBoxLayout(row)
-        h.setContentsMargins(10, 6, 10, 6)
-        h.setSpacing(8)
+        h.setContentsMargins(12, 8, 12, 8)
+        h.setSpacing(10)
+
+        # 图标
+        icon_lbl = QtWidgets.QLabel("🧠")
+        icon_lbl.setFixedWidth(20)
+        icon_lbl.setStyleSheet("font-size: 14px; background: transparent;")
+        icon_lbl.setAlignment(QtCore.Qt.AlignCenter)
+        h.addWidget(icon_lbl)
 
         left = QtWidgets.QVBoxLayout()
-        left.setSpacing(2)
+        left.setSpacing(3)
 
         name = info.get("name", "Unknown")
-        name_lbl = QtWidgets.QLabel(f"<b>🧠 {name}</b>")
-        name_lbl.setStyleSheet("color: #d4c5b0; background: transparent; font-size: 12px;")
+        name_lbl = QtWidgets.QLabel(
+            f"<span style='font-weight:600; color:#e0d4c0'>{name}</span>"
+        )
+        name_lbl.setObjectName("pmCardName")
         left.addWidget(name_lbl)
 
         desc = info.get("description", "")
         if desc:
             desc_lbl = QtWidgets.QLabel(desc[:120])
-            desc_lbl.setStyleSheet("color: #8a7e6e; background: transparent; font-size: 10px;")
+            desc_lbl.setObjectName("pmCardDesc")
             desc_lbl.setWordWrap(True)
             left.addWidget(desc_lbl)
 
         params = info.get("parameters", {})
         if params:
-            param_str = ", ".join(params.keys())
-            param_lbl = QtWidgets.QLabel(f"params: {param_str}")
-            param_lbl.setStyleSheet("color: #6e6454; background: transparent; font-size: 9px;")
-            left.addWidget(param_lbl)
+            param_names = list(params.keys())[:5]
+            tag_row = QtWidgets.QHBoxLayout()
+            tag_row.setSpacing(4)
+            for p in param_names:
+                tag = QtWidgets.QLabel(p)
+                tag.setObjectName("pmTagBadge")
+                tag_row.addWidget(tag)
+            tag_row.addStretch()
+            left.addLayout(tag_row)
 
         h.addLayout(left, 1)
 
@@ -7105,25 +7259,29 @@ class PluginSettingsPage(QtWidgets.QDialog):
         super().__init__(parent)
         self.setObjectName("pluginSettingsDlg")
         self.setWindowTitle(f"{tr('plugin.settings')} — {plugin_name}")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(420)
         self._plugin_name = plugin_name
         self._schema = settings_schema
         self._widgets: dict = {}  # key -> widget
 
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # 标题栏
+        header = QtWidgets.QFrame()
+        header.setObjectName("pmHeader")
+        header.setFixedHeight(40)
+        header_lay = QtWidgets.QHBoxLayout(header)
+        header_lay.setContentsMargins(14, 0, 14, 0)
+        title = QtWidgets.QLabel(f"⚙  {plugin_name}")
+        title.setObjectName("pmTitle")
+        header_lay.addWidget(title)
+        root.addWidget(header)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(10)
-
-        # 标题
-        title = QtWidgets.QLabel(f"⚙ {plugin_name}")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #d4c5b0; background: transparent;")
-        layout.addWidget(title)
-
-        # 分隔线
-        sep = QtWidgets.QFrame()
-        sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setStyleSheet("color: rgba(180,160,130,12);")
-        layout.addWidget(sep)
 
         # 读取当前设置值
         try:
@@ -7170,23 +7328,29 @@ class PluginSettingsPage(QtWidgets.QDialog):
         layout.addLayout(form)
         layout.addStretch()
 
-        # 按钮
-        btn_row = QtWidgets.QHBoxLayout()
-        btn_row.addStretch()
+        root.addLayout(layout, 1)
+
+        # 底部按钮栏
+        footer = QtWidgets.QFrame()
+        footer.setObjectName("pmFooter")
+        footer.setFixedHeight(42)
+        footer_lay = QtWidgets.QHBoxLayout(footer)
+        footer_lay.setContentsMargins(14, 0, 14, 0)
+        footer_lay.addStretch()
 
         btn_cancel = QtWidgets.QPushButton(tr('plugin.cancel'))
-        btn_cancel.setObjectName("pluginBtn")
+        btn_cancel.setObjectName("pmFooterBtn")
         btn_cancel.setCursor(QtCore.Qt.PointingHandCursor)
         btn_cancel.clicked.connect(self.reject)
-        btn_row.addWidget(btn_cancel)
+        footer_lay.addWidget(btn_cancel)
 
         btn_save = QtWidgets.QPushButton(tr('plugin.save'))
-        btn_save.setObjectName("pluginBtnPrimary")
+        btn_save.setObjectName("pmBtnPrimary")
         btn_save.setCursor(QtCore.Qt.PointingHandCursor)
         btn_save.clicked.connect(self._save)
-        btn_row.addWidget(btn_save)
+        footer_lay.addWidget(btn_save)
 
-        layout.addLayout(btn_row)
+        root.addWidget(footer)
 
     def _save(self):
         """保存设置"""

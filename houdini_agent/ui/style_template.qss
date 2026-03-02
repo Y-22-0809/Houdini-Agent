@@ -2134,71 +2134,276 @@ QPushButton#updateNotifyDismiss:hover {
 
 
 /* ============================================================
-   PLUGIN MANAGER (warm khaki)
+   PLUGIN MANAGER (warm khaki — redesigned)
    ============================================================ */
 
-QDialog#pluginManagerDlg, QDialog#pluginSettingsDlg {
+QDialog#pluginManagerDlg {
     background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1,
                     stop:0 #181510, stop:0.5 #14120e, stop:1 #100e0a);
     border: 1px solid rgba(180,160,130,15);
     border-radius: 8px;
     color: #d4c5b0;
 }
-QLabel#pluginManagerTitle {
+QDialog#pluginSettingsDlg {
+    background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1,
+                    stop:0 #181510, stop:0.5 #14120e, stop:1 #100e0a);
+    border: 1px solid rgba(180,160,130,15);
+    border-radius: 8px;
+    color: #d4c5b0;
+}
+
+/* ---- PM Header ---- */
+QFrame#pmHeader {
+    background: rgba(212,165,116,10);
+    border-bottom: 1px solid rgba(180,160,130,12);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+QLabel#pmTitle {
     font-size: {FS_LG}px;
     font-weight: bold;
     color: #d4c5b0;
     background: transparent;
-    padding: 4px 0;
 }
-QFrame#pluginRow {
-    background: rgba(40,35,28,200);
-    border: 1px solid rgba(180,160,130,10);
-    border-radius: 6px;
-    padding: 6px 8px;
-    margin: 2px 0;
-}
-QFrame#pluginRow:hover {
-    border: 1px solid rgba(212,165,116,30);
-    background: rgba(50,44,35,220);
-}
-QPushButton#pluginBtn {
+QLabel#pmStatsLabel {
     font-size: {FS_XS}px;
-    padding: 4px 12px;
-    border-radius: 4px;
-    background: rgba(45,40,32,200);
-    color: #b0a08c;
-    border: 1px solid rgba(180,160,130,18);
+    color: #8a7e6e;
+    background: transparent;
 }
-QPushButton#pluginBtn:hover {
+
+/* ---- PM Tab Widget (underline style) ---- */
+QTabWidget#pmTabs::pane {
+    background: transparent;
+    border: none;
+}
+QTabWidget#pmTabs > QTabBar {
+    background: transparent;
+}
+QTabWidget#pmTabs > QTabBar::tab {
+    background: transparent;
+    color: #7a6e5e;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 16px;
+    margin: 0 2px;
+    font-size: {FS_SM}px;
+    font-weight: 500;
+}
+QTabWidget#pmTabs > QTabBar::tab:selected {
+    color: #d4c5b0;
+    border-bottom: 2px solid #d4a574;
+}
+QTabWidget#pmTabs > QTabBar::tab:hover:!selected {
+    color: #b4a082;
+    border-bottom: 2px solid rgba(212,165,116,30);
+}
+
+/* ---- PM Tab Pages ---- */
+QWidget#pmTabPage {
+    background: transparent;
+}
+
+/* ---- PM Scroll Area ---- */
+QScrollArea#pmScroll {
+    background: transparent;
+    border: none;
+}
+QWidget#pmScrollInner {
+    background: transparent;
+}
+
+/* ---- PM Cards (plugin / tool / skill rows) ---- */
+QFrame#pmCard {
+    background: rgba(30,26,20,180);
+    border: 1px solid rgba(180,160,130,8);
+    border-radius: 6px;
+    margin: 1px 0;
+}
+QFrame#pmCard:hover {
+    border: 1px solid rgba(212,165,116,28);
+    background: rgba(40,35,28,220);
+}
+
+QLabel#pmCardName {
+    color: #e0d4c0;
+    background: transparent;
+    font-size: {FS_SM}px;
+}
+QLabel#pmCardDesc {
+    color: #8a7e6e;
+    background: transparent;
+    font-size: {FS_XS}px;
+}
+
+/* ---- PM Tag Badges ---- */
+QLabel#pmTagBadge {
+    background: rgba(212,165,116,15);
+    color: #b4a082;
+    border: 1px solid rgba(212,165,116,20);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 9px;
+}
+QLabel#pmTagBadgeAlt {
+    background: rgba(130,160,180,12);
+    color: #8a9a7e;
+    border: 1px solid rgba(130,160,180,18);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 9px;
+}
+
+/* ---- PM Group Headers ---- */
+QLabel#pmGroupHeader {
+    color: #b4a082;
+    font-size: {FS_SM}px;
+    font-weight: bold;
+    padding: 8px 4px 4px;
+    background: transparent;
+}
+
+/* ---- PM Empty State ---- */
+QFrame#pmEmptyState {
+    background: transparent;
+    border: 1px dashed rgba(180,160,130,15);
+    border-radius: 8px;
+}
+QLabel#pmEmptyTitle {
+    color: #b4a082;
+    font-size: {FS_MD}px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#pmEmptyHint {
+    color: #7a6e5e;
+    font-size: {FS_SM}px;
+    background: transparent;
+}
+QLabel#pmErrorLabel {
+    color: #d4897a;
+    padding: 12px;
+    background: transparent;
+}
+
+/* ---- PM Search Bar ---- */
+QLineEdit#pmSearchEdit {
+    background: rgba(22,19,14,200);
+    border: 1px solid rgba(180,160,130,10);
+    border-radius: 5px;
+    padding: 6px 10px;
+    color: #d4c5b0;
+    font-size: {FS_SM}px;
+}
+QLineEdit#pmSearchEdit:focus {
+    border: 1px solid rgba(212,165,116,45);
+    background: rgba(28,24,18,240);
+}
+QLineEdit#pmSearchEdit::placeholder {
+    color: #5a5040;
+}
+
+/* ---- PM Sub Label / Path Input ---- */
+QLabel#pmSubLabel {
+    color: #8a7e6e;
+    font-size: {FS_XS}px;
+    background: transparent;
+}
+QLineEdit#pmPathEdit {
+    background: rgba(22,19,14,200);
+    border: 1px solid rgba(180,160,130,10);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #d4c5b0;
+    font-size: {FS_XS}px;
+}
+
+/* ---- PM Skill Dir Frame ---- */
+QFrame#pmSkillDirFrame {
+    background: rgba(30,26,20,120);
+    border: 1px solid rgba(180,160,130,8);
+    border-radius: 5px;
+}
+
+/* ---- PM Icon Buttons ---- */
+QPushButton#pmIconBtn {
+    font-size: {FS_SM}px;
+    border-radius: 5px;
+    background: rgba(45,40,32,140);
+    color: #9a8e7e;
+    border: 1px solid rgba(180,160,130,10);
+}
+QPushButton#pmIconBtn:hover {
+    background: rgba(212,165,116,20);
+    color: #d4a574;
+    border-color: rgba(212,165,116,40);
+}
+
+/* ---- PM Footer ---- */
+QFrame#pmFooter {
+    background: rgba(212,165,116,6);
+    border-top: 1px solid rgba(180,160,130,10);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+QPushButton#pmFooterBtn {
+    font-size: {FS_XS}px;
+    border-radius: 4px;
+    padding: 5px 12px;
+    background: transparent;
+    color: #8a7e6e;
+    border: none;
+}
+QPushButton#pmFooterBtn:hover {
+    background: rgba(180,160,130,10);
+    color: #d4a574;
+}
+QPushButton#pmBtnPrimary {
+    font-size: {FS_XS}px;
+    font-weight: bold;
+    padding: 5px 16px;
+    border-radius: 5px;
+    background: rgba(212,165,116,160);
+    color: #1a1a18;
+    border: none;
+}
+QPushButton#pmBtnPrimary:hover {
+    background: rgba(212,165,116,210);
+}
+QPushButton#pmBtnSecondary {
+    font-size: {FS_XS}px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(45,40,32,180);
+    color: #b0a08c;
+    border: 1px solid rgba(180,160,130,15);
+}
+QPushButton#pmBtnSecondary:hover {
     background: rgba(55,48,38,230);
     color: #d4c5b0;
     border-color: rgba(212,165,116,40);
 }
-QPushButton#pluginBtnPrimary {
-    font-size: {FS_XS}px;
-    font-weight: bold;
-    padding: 4px 14px;
+
+/* ---- PM Checkbox (toggle switch style) ---- */
+QDialog#pluginManagerDlg QCheckBox {
+    spacing: 0px;
+}
+QDialog#pluginManagerDlg QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(180,160,130,25);
     border-radius: 4px;
+    background: rgba(30,26,20,200);
+}
+QDialog#pluginManagerDlg QCheckBox::indicator:hover {
+    border-color: rgba(212,165,116,50);
+    background: rgba(40,35,28,230);
+}
+QDialog#pluginManagerDlg QCheckBox::indicator:checked {
     background: rgba(212,165,116,180);
-    color: #1a1a18;
-    border: none;
+    border-color: #d4a574;
 }
-QPushButton#pluginBtnPrimary:hover {
-    background: rgba(212,165,116,220);
-}
-QPushButton#pluginBtnSmall {
-    font-size: {FS_XS}px;
-    border-radius: 4px;
-    background: rgba(45,40,32,160);
-    color: #b0a08c;
-    border: 1px solid rgba(180,160,130,12);
-}
-QPushButton#pluginBtnSmall:hover {
-    background: rgba(55,48,38,220);
-    color: #d4c5b0;
-    border-color: rgba(212,165,116,40);
-}
+
+/* ---- PM Toolbar Button (external usage) ---- */
 QPushButton#pluginToolbarBtn {
     font-size: {FS_SM}px;
     border-radius: 4px;
@@ -2211,61 +2416,6 @@ QPushButton#pluginToolbarBtn:hover {
     background: rgba(212,165,116,25);
     color: #d4a574;
     border: 1px solid rgba(212,165,116,50);
-}
-/* Plugin row checkbox (enable/disable toggle) */
-QDialog#pluginManagerDlg QCheckBox {
-    spacing: 0px;
-}
-QDialog#pluginManagerDlg QCheckBox::indicator {
-    width: 14px;
-    height: 14px;
-    border: 1px solid rgba(180,160,130,30);
-    border-radius: 3px;
-    background: transparent;
-}
-QDialog#pluginManagerDlg QCheckBox::indicator:hover {
-    border-color: rgba(212,165,116,60);
-}
-QDialog#pluginManagerDlg QCheckBox::indicator:checked {
-    background: rgba(212,165,116,200);
-    border-color: #d4a574;
-}
-
-/* Plugin Manager Tab Widget */
-QTabWidget#pluginManagerTabs::pane {
-    background: transparent;
-    border: 1px solid rgba(180,160,130,10);
-    border-radius: 4px;
-    top: -1px;
-}
-QTabWidget#pluginManagerTabs > QTabBar::tab {
-    background: rgba(30,26,20,180);
-    color: #8a7e6e;
-    border: 1px solid rgba(180,160,130,10);
-    border-bottom: none;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-    padding: 5px 14px;
-    margin-right: 2px;
-    font-size: {FS_SM}px;
-}
-QTabWidget#pluginManagerTabs > QTabBar::tab:selected {
-    background: rgba(212,165,116,20);
-    color: #d4c5b0;
-    border-color: rgba(212,165,116,30);
-}
-QTabWidget#pluginManagerTabs > QTabBar::tab:hover:!selected {
-    background: rgba(180,160,130,12);
-    color: #b4a082;
-}
-/* Skill dir input */
-QLineEdit#skillDirEdit {
-    background: rgba(30,26,20,200);
-    border: 1px solid rgba(180,160,130,12);
-    border-radius: 4px;
-    padding: 3px 6px;
-    color: #d4c5b0;
-    font-size: {FS_XS}px;
 }
 
 
