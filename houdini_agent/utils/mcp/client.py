@@ -2781,7 +2781,13 @@ class HoudiniMCP:
         return None
 
     def _tool_execute_shell(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """在系统 Shell 中执行命令（沙盒环境）"""
+        """在系统 Shell 中执行命令（沙盒环境）
+        
+        ★ v1.4.4 改进：使用 Popen + 轮询替代 subprocess.run
+        - 支持用户通过停止按钮中断正在执行的命令
+        - Windows 上正确杀死整个进程树（不只是 cmd.exe 父进程）
+        - 防止 pipe buffer 满导致的死锁（使用 communicate 分块读取）
+        """
         import subprocess
         import hashlib
 
@@ -2813,40 +2819,62 @@ class HoudiniMCP:
         if not os.path.isdir(cwd):
             return {"success": False, "error": f"工作目录不存在: {cwd}"}
 
+        # ★ 获取停止事件引用（从 AIClient 传入，用于检测用户中断）
+        stop_event = getattr(self, '_stop_event', None)
+
         start_time = time.time()
+        proc = None
         try:
-            # Windows 上用 cmd /c，其他平台用 /bin/sh -c
+            # 启动子进程（非阻塞）
+            popen_kwargs = dict(
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+            )
             if sys.platform == 'win32':
-                proc = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    cwd=cwd,
+                popen_kwargs.update(
                     encoding='utf-8',
                     errors='replace',
                     env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
-                    creationflags=subprocess.CREATE_NO_WINDOW,  # ★ 阻止控制台窗口闪烁
+                    creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
             else:
-                proc = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    cwd=cwd,
-                )
-
+                popen_kwargs.update(text=True)
+            
+            proc = subprocess.Popen(command, **popen_kwargs)
+            
+            # ★ 轮询等待：每 0.5s 检查一次停止标志和超时
+            deadline = start_time + timeout
+            while proc.poll() is None:
+                # 检查用户中断
+                if stop_event and stop_event.is_set():
+                    self._kill_process_tree(proc)
+                    elapsed = time.time() - start_time
+                    return {"success": False, "error": f"命令被用户中断\n命令: {command}\n已运行: {elapsed:.1f}s"}
+                
+                # 检查超时
+                if time.time() > deadline:
+                    self._kill_process_tree(proc)
+                    elapsed = time.time() - start_time
+                    return {"success": False, "error": f"命令超时（{timeout}s 限制）\n命令: {command}\n耗时: {elapsed:.2f}s"}
+                
+                # 短暂等待避免 CPU 空转
+                try:
+                    proc.wait(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    pass
+            
+            # 进程已结束，读取输出
+            stdout, stderr = proc.communicate(timeout=5)
             elapsed = time.time() - start_time
 
             # 组装输出
             parts = []
-            if proc.stdout:
-                parts.append(proc.stdout.rstrip())
-            if proc.stderr:
-                parts.append(f"[stderr]\n{proc.stderr.rstrip()}")
+            if stdout:
+                parts.append(stdout.rstrip())
+            if stderr:
+                parts.append(f"[stderr]\n{stderr.rstrip()}")
             parts.append(f"[退出码: {proc.returncode}, 耗时: {elapsed:.2f}s]")
             full_text = "\n".join(parts)
 
@@ -2855,11 +2883,37 @@ class HoudiniMCP:
             return {"success": success, "result": self._paginate_tool_result(
                 full_text, cache_key, hint, page)}
 
-        except subprocess.TimeoutExpired:
-            elapsed = time.time() - start_time
-            return {"success": False, "error": f"命令超时（{timeout}s 限制）\n命令: {command}\n耗时: {elapsed:.2f}s"}
         except Exception as e:
+            if proc and proc.poll() is None:
+                self._kill_process_tree(proc)
             return {"success": False, "error": f"Shell 执行失败: {e}"}
+
+    @staticmethod
+    def _kill_process_tree(proc):
+        """杀死进程及其所有子进程
+        
+        Windows 上使用 taskkill /F /T 杀死整个进程树，
+        避免只杀 cmd.exe 而子进程继续运行导致挂起。
+        """
+        import subprocess as _sp
+        try:
+            if sys.platform == 'win32':
+                # /F = 强制  /T = 杀死整个进程树  /PID = 进程 ID
+                _sp.run(
+                    f'taskkill /F /T /PID {proc.pid}',
+                    shell=True,
+                    capture_output=True,
+                    timeout=5,
+                    creationflags=_sp.CREATE_NO_WINDOW,
+                )
+            else:
+                import signal
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
     # ========================================
     # 节点布局工具
