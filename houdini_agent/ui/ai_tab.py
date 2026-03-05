@@ -2174,7 +2174,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         results = []
         for tool_name, kwargs in batch:
             try:
-                result = self._mcp_client.execute_tool(tool_name, **kwargs)
+                result = self.mcp.execute_tool(tool_name, kwargs)
             except Exception as e:
                 result = {"success": False, "error": str(e)}
             results.append(result)
