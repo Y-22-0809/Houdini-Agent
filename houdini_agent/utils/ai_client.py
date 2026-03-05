@@ -3136,8 +3136,8 @@ class AIClient:
         provider = (provider or 'openai').lower()
         api_key = self._get_api_key(provider)
         
-        # Ollama 不需要 API Key 验证
-        if provider != 'ollama' and not api_key:
+        # Ollama / Custom（无 Key）不需要 API Key 验证
+        if provider not in ('ollama', 'custom') and not api_key:
             yield {"type": "error", "error": f"缺少 {self._get_vendor_name(provider)} API Key"}
             return
         
@@ -3545,7 +3545,7 @@ class AIClient:
         
         provider = (provider or 'openai').lower()
         api_key = self._get_api_key(provider)
-        if not api_key:
+        if not api_key and provider not in ('ollama', 'custom'):
             return {'ok': False, 'error': f'缺少 API Key'}
         
         payload = {
