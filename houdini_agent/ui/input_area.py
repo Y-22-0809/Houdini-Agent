@@ -300,6 +300,8 @@ class InputAreaMixin:
 
     def _on_show_tool_status(self, tool_name: str):
         """在输入区域状态栏显示当前正在执行的工具"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             self.thinking_bar.show_tool(tool_name)
         except RuntimeError:
@@ -307,6 +309,8 @@ class InputAreaMixin:
 
     def _on_hide_tool_status(self):
         """隐藏工具状态"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             self.thinking_bar.hide_tool()
         except RuntimeError:
@@ -314,6 +318,8 @@ class InputAreaMixin:
 
     def _on_show_generating(self):
         """显示 Generating... 状态（API 请求等待中）"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             self.thinking_bar.show_generating()
         except RuntimeError:
@@ -321,6 +327,8 @@ class InputAreaMixin:
 
     def _on_show_planning(self, progress: str):
         """显示 Planning... 进度（Plan 模式正在生成计划时）"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             self.thinking_bar.show_planning(progress)
         except RuntimeError:

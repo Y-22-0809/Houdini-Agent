@@ -1295,6 +1295,18 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             # ★ 启动输入框呼吸光晕
             self._start_input_glow()
         else:
+            # ★ 先停止所有动效（此时 _agent_response 引用仍有效）
+            if self._thinking_timer:
+                self._thinking_timer.stop()
+                self._thinking_timer = None
+            self._stop_input_glow()
+            self._stop_active_aurora()
+            # ★ 强制停止 thinking_bar（防止延迟到达的 _showGenerating 信号重新启动）
+            try:
+                self.thinking_bar.stop()
+            except (RuntimeError, AttributeError):
+                pass
+            
             # 将完成后的状态写回 session 字典
             if self._agent_session_id and self._agent_session_id in self._sessions:
                 s = self._sessions[self._agent_session_id]
@@ -1313,14 +1325,6 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             self._agent_token_stats = None
             self._agent_todo_list = None
             self._agent_chat_layout = None
-            
-            if self._thinking_timer:
-                self._thinking_timer.stop()
-                self._thinking_timer = None
-            
-            # ★ 停止输入框呼吸光晕 + 停止活跃 response 的流光
-            self._stop_input_glow()
-            self._stop_active_aurora()
         
         # 按当前显示的 session 更新按钮状态
         self._update_run_buttons()
@@ -1546,6 +1550,8 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
     @QtCore.Slot()
     def _resume_thinking_main_thread(self):
         """[主线程] 实际执行恢复思考区块并重启计时器"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             resp = self._agent_response or self._current_response
             if resp and resp._has_thinking:
@@ -1685,6 +1691,8 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
     @QtCore.Slot(str)
     def _on_add_thinking(self, text: str):
         """在主线程更新思考内容（槽函数）"""
+        if not getattr(self, '_is_running', False):
+            return  # Agent 已停止，忽略延迟到达的信号
         try:
             resp = self._agent_response or self._current_response
             if resp:
