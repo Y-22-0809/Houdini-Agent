@@ -499,8 +499,8 @@ HOUDINI_TOOLS = [
                     },
                     "run_over": {
                         "type": "string",
-                        "enum": ["Points", "Vertices", "Primitives", "Detail"],
-                        "description": "运行模式：Points（点，默认）, Vertices（顶点）, Primitives（图元）, Detail（全局）"
+                        "enum": ["Points", "Vertices", "Primitives", "Detail", "Numbers"],
+                        "description": "运行模式（与 Houdini class 一致）：Points=2（点，默认）, Vertices=3, Primitives=1, Detail=0（全局）, Numbers=4（指定迭代次数）"
                     },
                     "parent_path": {
                         "type": "string",

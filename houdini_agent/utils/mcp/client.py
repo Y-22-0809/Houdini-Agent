@@ -1527,14 +1527,15 @@ class HoudiniMCP:
         except Exception as exc:
             return False, f"设置 VEX 代码失败: {exc}"
         
-        # 设置运行模式
+        # 设置运行模式（与 Houdini Attrib Wrangle parm("class") 菜单一致：0=Detail, 1=Primitives, 2=Points, 3=Vertices, 4=Numbers）
         run_over_map = {
-            "Points": 0,
-            "Vertices": 1, 
-            "Primitives": 2,
-            "Detail": 3
+            "Detail": 0,
+            "Primitives": 1,
+            "Points": 2,
+            "Vertices": 3,
+            "Numbers": 4,
         }
-        run_over_value = run_over_map.get(run_over, 0)
+        run_over_value = run_over_map.get(run_over, 2)  # 默认 Points
         
         try:
             class_parm = new_node.parm("class")
