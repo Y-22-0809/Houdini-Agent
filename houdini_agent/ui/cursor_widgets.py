@@ -6751,13 +6751,14 @@ class UpdateNotificationBanner(QtWidgets.QFrame):
     
     轻量横幅，不打断聊天对话流。
     用户可点击"立即更新"或关闭横幅。
+    支持显示更新摘要（release_notes 首行）。
     """
     
     updateClicked = QtCore.Signal()   # 点击"立即更新"
     dismissClicked = QtCore.Signal()  # 点击"关闭"
     
     def __init__(self, remote_version: str, release_name: str = "",
-                 local_version: str = "", parent=None):
+                 local_version: str = "", release_notes: str = "", parent=None):
         super().__init__(parent)
         self.setObjectName("updateNotifyBanner")
         self.setVisible(False)  # 默认隐藏，由外部调用 show()
@@ -6772,6 +6773,12 @@ class UpdateNotificationBanner(QtWidgets.QFrame):
         icon_lbl.setStyleSheet("background: transparent; border: none;")
         row.addWidget(icon_lbl)
         
+        # 左侧：版本 + 摘要（垂直堆叠）
+        text_widget = QtWidgets.QWidget()
+        text_layout = QtWidgets.QVBoxLayout(text_widget)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(2)
+        
         # 版本信息文字
         info_text = tr('update.notify_banner', local_version, remote_version)
         if release_name:
@@ -6779,7 +6786,17 @@ class UpdateNotificationBanner(QtWidgets.QFrame):
         info_lbl = QtWidgets.QLabel(info_text)
         info_lbl.setObjectName("updateNotifyInfo")
         info_lbl.setWordWrap(False)
-        row.addWidget(info_lbl, 1)
+        text_layout.addWidget(info_lbl)
+        
+        # 更新摘要（首行，小字）
+        if release_notes and release_notes.strip():
+            notes_lbl = QtWidgets.QLabel(release_notes.strip())
+            notes_lbl.setObjectName("updateNotifyNotes")
+            notes_lbl.setWordWrap(True)
+            notes_lbl.setStyleSheet("color: inherit; opacity: 0.85; font-size: 0.92em;")
+            text_layout.addWidget(notes_lbl)
+        
+        row.addWidget(text_widget, 1)
         
         # "立即更新" 按钮
         update_btn = QtWidgets.QPushButton(tr('update.notify_update_now'))

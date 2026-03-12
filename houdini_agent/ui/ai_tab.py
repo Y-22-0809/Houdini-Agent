@@ -7352,15 +7352,17 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             # 2) 保存检查结果，供手动点击时直接使用
             self._cached_update_result = result
             
-            # 3) ★ 在输入区域上方显示更新通知横幅（不打断聊天流）
+            # 3) ★ 在输入区域上方显示更新通知横幅（含更新摘要）
             try:
                 if hasattr(self, '_update_banner') and self._update_banner:
                     self._update_banner.setVisible(True)
                 else:
+                    release_notes = result.get('release_notes', '').strip()
                     self._update_banner = UpdateNotificationBanner(
                         remote_version=remote_ver,
                         release_name=release_name,
                         local_version=local_ver,
+                        release_notes=release_notes,
                     )
                     self._update_banner.updateClicked.connect(self._on_banner_update)
                     # 插入到输入区域布局的最顶部（batch_bar 之前）
@@ -7458,11 +7460,26 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         if reply == QtWidgets.QMessageBox.Yes:
             self._start_update()
 
+    # 更新进度文案轮播（下载阶段无百分比时使用）
+    _UPDATE_FUNNY_MESSAGES = [
+        "文件正在赶来的路上…",
+        "数据正在穿越互联网…",
+        "服务器正在翻箱倒柜找数据…",
+        "正在和后端同学对齐信息…",
+        "正在同步相关服务…",
+        "进度条正在努力工作…",
+        "正在从云里把数据拽下来…",
+        "服务器正在回忆文件放在哪…",
+        "正在构建本次请求的最佳实践…",
+        "数据已经发车，很快到站…",
+    ]
+
     def _start_update(self):
         """开始下载并应用更新"""
-        # 创建进度对话框
+        # 创建进度对话框，初始即用第一条搞怪文案 + 不确定进度条（动效）
+        first_msg = self._UPDATE_FUNNY_MESSAGES[0]
         self._update_progress_dlg = QtWidgets.QProgressDialog(
-            "正在下载更新…", "取消", 0, 100, self
+            first_msg, "取消", 0, 100, self
         )
         self._update_progress_dlg.setWindowTitle("更新 Houdini Agent")
         self._update_progress_dlg.setWindowModality(QtCore.Qt.WindowModal)
@@ -7470,6 +7487,12 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         self._update_progress_dlg.setAutoReset(False)
         self._update_progress_dlg.setMinimumDuration(0)
         self._update_progress_dlg.setValue(0)
+        # 无 Content-Length 时只动不显示百分比：用不确定进度条
+        self._update_progress_dlg.setRange(0, 0)
+        # 文案轮播定时器（在 _on_update_progress 收到 downloading 0 时启动）
+        self._update_msg_index = 0
+        self._update_msg_timer = None
+        self._update_fade_anim = None
         # QProgressDialog / QProgressBar 样式由全局 QSS 控制
         
         # 连接信号
@@ -7494,25 +7517,95 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         """进度回调（从后台线程调用 → 通过信号到主线程）"""
         self._updateProgress.emit(stage, percent)
 
+    def _stop_update_msg_timer(self):
+        """停止更新文案轮播定时器"""
+        if getattr(self, '_update_msg_timer', None) is not None:
+            self._update_msg_timer.stop()
+            self._update_msg_timer.deleteLater()
+            self._update_msg_timer = None
+        if getattr(self, '_update_fade_anim', None) is not None:
+            try:
+                self._update_fade_anim.stop()
+            except Exception:
+                pass
+            self._update_fade_anim = None
+
+    def _rotate_update_message(self):
+        """轮播搞怪文案并做淡入动效"""
+        if not hasattr(self, '_update_progress_dlg') or self._update_progress_dlg is None:
+            return
+        msgs = self._UPDATE_FUNNY_MESSAGES
+        if not msgs:
+            return
+        self._update_msg_index = (self._update_msg_index + 1) % len(msgs)
+        new_text = msgs[self._update_msg_index]
+        self._update_progress_dlg.setLabelText(new_text)
+        # 淡入动效：找到对话框里的 QLabel，用 QGraphicsOpacityEffect + QPropertyAnimation
+        label = self._update_progress_dlg.findChild(QtWidgets.QLabel)
+        if label is not None:
+            effect = label.graphicsEffect()
+            if effect is None:
+                effect = QtWidgets.QGraphicsOpacityEffect(label)
+                label.setGraphicsEffect(effect)
+            effect.setOpacity(0.28)
+            if getattr(self, '_update_fade_anim', None) is not None:
+                try:
+                    self._update_fade_anim.stop()
+                except Exception:
+                    pass
+            anim = QtCore.QPropertyAnimation(effect, b"opacity")
+            anim.setDuration(380)
+            anim.setStartValue(0.28)
+            anim.setEndValue(1.0)
+            anim.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+            self._update_fade_anim = anim
+
     @QtCore.Slot(str, int)
     def _on_update_progress(self, stage: str, percent: int):
-        """[主线程] 更新进度条"""
+        """[主线程] 更新进度条（无 Content-Length 时不确定进度条 + 搞怪文案轮播）"""
         if not hasattr(self, '_update_progress_dlg') or self._update_progress_dlg is None:
             return
         
-        stage_labels = {
-            'downloading': '正在下载…',
-            'extracting': '正在解压…',
-            'applying': '正在更新文件…',
-            'done': '更新完成！',
-        }
-        label = stage_labels.get(stage, stage)
-        self._update_progress_dlg.setLabelText(f"{label} ({percent}%)")
-        self._update_progress_dlg.setValue(percent)
+        if stage == 'downloading':
+            if percent == 0:
+                self._update_progress_dlg.setRange(0, 0)
+                self._update_progress_dlg.setLabelText(self._UPDATE_FUNNY_MESSAGES[0])
+                self._update_msg_index = 0
+                if getattr(self, '_update_msg_timer', None) is None:
+                    self._update_msg_timer = QtCore.QTimer(self)
+                    self._update_msg_timer.timeout.connect(self._rotate_update_message)
+                    self._update_msg_timer.start(2200)
+            elif 1 <= percent <= 99:
+                self._stop_update_msg_timer()
+                self._update_progress_dlg.setRange(0, 100)
+                self._update_progress_dlg.setValue(percent)
+                self._update_progress_dlg.setLabelText(f"正在下载… {percent}%")
+            else:
+                self._stop_update_msg_timer()
+                self._update_progress_dlg.setRange(0, 100)
+                self._update_progress_dlg.setValue(100)
+                self._update_progress_dlg.setLabelText("下载完成")
+        elif stage == 'extracting':
+            self._stop_update_msg_timer()
+            self._update_progress_dlg.setRange(0, 0)
+            self._update_progress_dlg.setLabelText("正在解压…")
+            self._update_progress_dlg.setValue(0)
+        elif stage == 'applying':
+            self._update_progress_dlg.setRange(0, 0)
+            self._update_progress_dlg.setLabelText("正在更新文件…")
+        elif stage == 'done':
+            self._stop_update_msg_timer()
+            self._update_progress_dlg.setRange(0, 100)
+            self._update_progress_dlg.setValue(100)
+            self._update_progress_dlg.setLabelText("更新完成！")
+        else:
+            self._update_progress_dlg.setValue(percent)
+            self._update_progress_dlg.setLabelText(f"{stage} ({percent}%)")
 
     @QtCore.Slot(dict)
     def _on_update_apply_result(self, result: dict):
         """[主线程] 更新完成后的处理"""
+        self._stop_update_msg_timer()
         # 关闭进度条
         if hasattr(self, '_update_progress_dlg') and self._update_progress_dlg:
             self._update_progress_dlg.close()
