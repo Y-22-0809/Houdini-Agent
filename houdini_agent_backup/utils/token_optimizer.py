@@ -94,12 +94,22 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     'claude-opus-4-5-max':  {'input': 15.00, 'input_cache': 1.50,  'output': 75.00, 'reasoning': 75.00},
     'claude-opus-4-6-normal': {'input': 15.00, 'input_cache': 1.50, 'output': 75.00, 'reasoning': 75.00},
     'claude-opus-4-6-kiro': {'input': 15.00, 'input_cache': 1.50,  'output': 75.00, 'reasoning': 75.00},
+    'claude-opus-4-6-gemini': {'input': 15.00, 'input_cache': 1.50, 'output': 75.00, 'reasoning': 75.00},
+    'claude-opus-4-6-max': {'input': 15.00, 'input_cache': 1.50, 'output': 75.00, 'reasoning': 75.00},
     'claude-sonnet-4-5':    {'input': 3.00,  'input_cache': 0.30,  'output': 15.00, 'reasoning': 15.00},
+    'claude-sonnet-4-6':    {'input': 3.00,  'input_cache': 0.30,  'output': 15.00, 'reasoning': 15.00},
     'claude-haiku-4-5':     {'input': 0.80,  'input_cache': 0.08,  'output': 4.00},
     # ---- Gemini ----
     'gemini-3-pro-image-preview': {'input': 1.25, 'input_cache': 0.30, 'output': 10.00},
+    'gemini-3-flash':       {'input': 0.50,  'input_cache': 0.125, 'output': 3.00},
+    'gemini-3.1-pro':       {'input': 1.25,  'input_cache': 0.30,  'output': 10.00},
     # ---- GLM (智谱清言) ----
     'glm-4.7':              {'input': 0.50,  'input_cache': 0.50,  'output': 0.50},
+    'glm-5-turbo':          {'input': 0.50,  'input_cache': 0.50,  'output': 0.50},
+    'glm-5.1':              {'input': 0.50,  'input_cache': 0.50,  'output': 0.50},
+    # ---- MiniMax ----
+    'MiniMax-M2.7':         {'input': 1.00,  'input_cache': 0.25,  'output': 4.00},
+    'MiniMax-M2.7-highspeed': {'input': 1.00, 'input_cache': 0.25, 'output': 4.00},
     # ---- Qwen ----
     'qwen-plus':            {'input': 0.80,  'input_cache': 0.20,  'output': 2.00},
     'qwen-max':             {'input': 2.00,  'input_cache': 0.50,  'output': 6.00},

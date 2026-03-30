@@ -47,16 +47,16 @@ class HeaderMixin:
             'glm': ['glm-4.7'],
             'openai': ['gpt-5.2', 'gpt-5.3-codex'],
             'duojie': [
+                'claude-opus-4-6-gemini',
+                'claude-opus-4-6-max',
                 'claude-sonnet-4-5',
-                'claude-opus-4-5-kiro',
-                'claude-opus-4-5-max',
-                'claude-opus-4-6-normal',
-                'claude-opus-4-6-kiro',
-                'claude-haiku-4-5',
-                'gemini-3-pro-image-preview',
-                'gpt-5.3-codex',
-                'glm-4.7',
-                'glm-5',
+                'claude-sonnet-4-6',
+                'gemini-3-flash',
+                'gemini-3.1-pro',
+                'glm-5-turbo',
+                'glm-5.1',
+                'MiniMax-M2.7',
+                'MiniMax-M2.7-highspeed',
             ],
         }
         self._model_context_limits = {
@@ -66,15 +66,16 @@ class HeaderMixin:
             'gpt-5.2': 128000,
             'gpt-5.3-codex': 200000,
             # Duojie 模型
+            'claude-opus-4-6-gemini': 200000,
+            'claude-opus-4-6-max': 200000,
             'claude-sonnet-4-5': 200000,
-            'claude-opus-4-5-kiro': 200000,
-            'claude-opus-4-5-max': 200000,
-            'claude-opus-4-6-normal': 200000,
-            'claude-opus-4-6-kiro': 200000,
-            'claude-haiku-4-5': 200000,
-            'gemini-3-pro-image-preview': 128000,
-            # Duojie - GLM (Anthropic 协议)
-            'glm-5': 200000,
+            'claude-sonnet-4-6': 200000,
+            'gemini-3-flash': 1048576,
+            'gemini-3.1-pro': 1048576,
+            'glm-5-turbo': 200000,
+            'glm-5.1': 200000,
+            'MiniMax-M2.7': 128000,
+            'MiniMax-M2.7-highspeed': 128000,
         }
         # 模型特性配置
         # supports_prompt_caching: 是否支持提示缓存（保持消息前缀稳定可自动命中）
@@ -94,16 +95,19 @@ class HeaderMixin:
             'gpt-5.2':                    {'supports_prompt_caching': True, 'supports_vision': True},
             'gpt-5.3-codex':              {'supports_prompt_caching': True, 'supports_vision': True},
             # Duojie - Claude
+            'claude-opus-4-6-gemini':    {'supports_prompt_caching': True, 'supports_vision': True},
+            'claude-opus-4-6-max':        {'supports_prompt_caching': True, 'supports_vision': True},
             'claude-sonnet-4-5':          {'supports_prompt_caching': True, 'supports_vision': True},
-            'claude-opus-4-5-kiro':       {'supports_prompt_caching': True, 'supports_vision': True},
-            'claude-opus-4-5-max':        {'supports_prompt_caching': True, 'supports_vision': True},
-            'claude-opus-4-6-normal':     {'supports_prompt_caching': True, 'supports_vision': True},
-            'claude-opus-4-6-kiro':       {'supports_prompt_caching': True, 'supports_vision': True},
-            'claude-haiku-4-5':           {'supports_prompt_caching': True, 'supports_vision': True},
+            'claude-sonnet-4-6':          {'supports_prompt_caching': True, 'supports_vision': True},
             # Duojie - Gemini
-            'gemini-3-pro-image-preview': {'supports_prompt_caching': True, 'supports_vision': True},
+            'gemini-3-flash':             {'supports_prompt_caching': True, 'supports_vision': True},
+            'gemini-3.1-pro':             {'supports_prompt_caching': True, 'supports_vision': True},
             # Duojie - GLM (Anthropic 协议)
-            'glm-5':                      {'supports_prompt_caching': True, 'supports_vision': False},
+            'glm-5-turbo':                {'supports_prompt_caching': True, 'supports_vision': False},
+            'glm-5.1':                    {'supports_prompt_caching': True, 'supports_vision': False},
+            # Duojie - MiniMax
+            'MiniMax-M2.7':               {'supports_prompt_caching': True, 'supports_vision': False},
+            'MiniMax-M2.7-highspeed':     {'supports_prompt_caching': True, 'supports_vision': False},
         }
         self._refresh_models('ollama')
         self.model_combo.setMinimumWidth(100)

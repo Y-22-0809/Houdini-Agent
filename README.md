@@ -38,7 +38,7 @@ User request → AI plans → call tools → inspect results → call more tools
 | **GLM (Zhipu AI)** | `glm-4.7` | Stable in China, native reasoning & tool calling |
 | **OpenAI** | `gpt-5.2`, `gpt-5.3-codex` | Powerful, full Function Calling & Vision support |
 | **Ollama** (local) | `qwen2.5:14b`, any local model | Privacy-first, auto-detects available models |
-| **Duojie** (relay) | `claude-sonnet-4-5`, `claude-opus-4-5-kiro`, `claude-opus-4-5-max`, `claude-opus-4-6-normal`, `claude-opus-4-6-kiro`, `claude-haiku-4-5`, `gemini-3-pro-image-preview`, `glm-4.7`, `glm-5`, `kimi-k2.5`, `MiniMax-M2.5`, `qwen3.5-plus`, `gpt-5.3-codex` | Access to Claude, Gemini, GLM, Kimi, MiniMax, Qwen models via relay endpoint |
+| **Duojie** (relay) | `claude-opus-4-6-gemini`, `claude-opus-4-6-max`, `claude-sonnet-4-5`, `claude-sonnet-4-6`, `gemini-3-flash`, `gemini-3.1-pro`, `glm-5-turbo`, `glm-5.1`, `MiniMax-M2.7`, `MiniMax-M2.7-highspeed` | Claude, Gemini, GLM, MiniMax via relay endpoint |
 
 ### Vision / Image Input
 

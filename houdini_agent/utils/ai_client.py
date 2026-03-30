@@ -1378,8 +1378,8 @@ class AIClient:
     DUOJIE_ANTHROPIC_API_URL = "https://api.duojie.games/v1/messages"  # 拼好饭中转站（Anthropic 协议）
     OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"  # OpenRouter（OpenAI 兼容）
     
-    # 使用 Anthropic 协议的 Duojie 模型
-    _DUOJIE_ANTHROPIC_MODELS = frozenset({'glm-4.7', 'glm-5'})
+    # 使用 Anthropic 协议的 Duojie 模型（GLM 系等）
+    _DUOJIE_ANTHROPIC_MODELS = frozenset({'glm-4.7', 'glm-5', 'glm-5-turbo', 'glm-5.1'})
 
     # ★ 预编译流式内容清洗正则（避免每个 SSE chunk 都重新编译）
     _RE_CLEAN_PATTERNS = [
