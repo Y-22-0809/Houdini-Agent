@@ -2704,5 +2704,338 @@ QDialog#pluginSettingsDlg QCheckBox::indicator:checked {
 
 
 /* ============================================================
+   MEMORY MANAGER  —  Modern Minimal · Deep Charcoal · Warm Accent
+   Isolated from host: frameless, Fusion, descendant wildcard.
+
+   Font-size hierarchy (only 2 tiers + 1 chrome title):
+     {FS_SM}   — everything: inputs, buttons, labels, lists, hints
+     {FS_BODY} — chrome window title only
+   Visual hierarchy via color contrast, not font-size variation.
+   ============================================================ */
+
+/* ── Root ── */
+QDialog#memoryManagerDlg { background: transparent; border: none; }
+QDialog#memoryManagerDlg * {
+    color: #c8c0b4;
+    background-color: transparent;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: {FS_SM}px;
+    selection-background-color: rgba(200,160,110,28);
+    selection-color: #f0e8dc;
+    outline: none;
+}
+
+/* ── Scrollbar (thin, minimal) ── */
+QDialog#memoryManagerDlg QScrollBar:vertical {
+    background: transparent; width: 5px; margin: 0; border: none;
+}
+QDialog#memoryManagerDlg QScrollBar::handle:vertical {
+    background: rgba(160,145,125,40); min-height: 36px; border-radius: 2px;
+}
+QDialog#memoryManagerDlg QScrollBar::handle:vertical:hover { background: rgba(200,165,120,60); }
+QDialog#memoryManagerDlg QScrollBar::add-line:vertical, QDialog#memoryManagerDlg QScrollBar::sub-line:vertical,
+QDialog#memoryManagerDlg QScrollBar::add-page:vertical, QDialog#memoryManagerDlg QScrollBar::sub-page:vertical {
+    background: none; height: 0; border: none;
+}
+QDialog#memoryManagerDlg QScrollBar:horizontal {
+    background: transparent; height: 5px; margin: 0; border: none;
+}
+QDialog#memoryManagerDlg QScrollBar::handle:horizontal {
+    background: rgba(160,145,125,40); min-width: 36px; border-radius: 2px;
+}
+QDialog#memoryManagerDlg QScrollBar::handle:horizontal:hover { background: rgba(200,165,120,60); }
+QDialog#memoryManagerDlg QScrollBar::add-line:horizontal, QDialog#memoryManagerDlg QScrollBar::sub-line:horizontal,
+QDialog#memoryManagerDlg QScrollBar::add-page:horizontal, QDialog#memoryManagerDlg QScrollBar::sub-page:horizontal {
+    background: none; width: 0; border: none;
+}
+
+/* ── Generic input overrides ── */
+QDialog#memoryManagerDlg QLineEdit {
+    background: rgba(255,255,255,4); border: 1px solid rgba(255,255,255,6);
+    border-radius: 6px; padding: 7px 10px; color: #c8c0b4;
+}
+QDialog#memoryManagerDlg QLineEdit:focus {
+    border-color: rgba(200,165,120,40); background: rgba(255,255,255,6);
+}
+QDialog#memoryManagerDlg QLineEdit[readOnly="true"] {
+    background: rgba(255,255,255,2); border: 1px solid rgba(255,255,255,4);
+    color: #706860; font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+QDialog#memoryManagerDlg QPlainTextEdit {
+    background: rgba(255,255,255,3); border: 1px solid rgba(255,255,255,5);
+    border-radius: 6px; padding: 10px 12px; color: #c8c0b4;
+}
+QDialog#memoryManagerDlg QPlainTextEdit:focus { border-color: rgba(200,165,120,35); }
+QDialog#memoryManagerDlg QAbstractSpinBox {
+    background: rgba(255,255,255,4); border: 1px solid rgba(255,255,255,6);
+    border-radius: 6px; padding: 5px 8px; color: #c8c0b4; min-height: 24px;
+}
+QDialog#memoryManagerDlg QAbstractSpinBox:focus { border-color: rgba(200,165,120,40); }
+QDialog#memoryManagerDlg QAbstractSpinBox::up-button,
+QDialog#memoryManagerDlg QAbstractSpinBox::down-button {
+    width: 18px; background: rgba(255,255,255,4); border: none; subcontrol-origin: border;
+}
+QDialog#memoryManagerDlg QAbstractSpinBox::up-button { subcontrol-position: top right; border-top-right-radius: 5px; }
+QDialog#memoryManagerDlg QAbstractSpinBox::down-button { subcontrol-position: bottom right; border-bottom-right-radius: 5px; }
+QDialog#memoryManagerDlg QAbstractSpinBox::up-button:hover,
+QDialog#memoryManagerDlg QAbstractSpinBox::down-button:hover { background: rgba(200,165,120,18); }
+QDialog#memoryManagerDlg QAbstractSpinBox::up-arrow {
+    image: none; width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-bottom: 4px solid #8a8070;
+}
+QDialog#memoryManagerDlg QAbstractSpinBox::down-arrow {
+    image: none; width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-top: 4px solid #8a8070;
+}
+QDialog#memoryManagerDlg QCheckBox { color: #c8c0b4; spacing: 8px; }
+QDialog#memoryManagerDlg QCheckBox::indicator {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1px solid rgba(255,255,255,10); background: rgba(255,255,255,4);
+}
+QDialog#memoryManagerDlg QCheckBox::indicator:checked {
+    background: rgba(200,165,120,200); border-color: rgba(200,165,120,120);
+}
+QDialog#memoryManagerDlg QComboBox {
+    background: rgba(255,255,255,4); color: #c8c0b4;
+    border: 1px solid rgba(255,255,255,6); border-radius: 6px;
+    padding: 6px 10px; min-height: 24px;
+}
+QDialog#memoryManagerDlg QComboBox:hover { border-color: rgba(200,165,120,35); }
+QDialog#memoryManagerDlg QComboBox::drop-down {
+    border: none; width: 22px; subcontrol-origin: padding; subcontrol-position: center right;
+}
+QDialog#memoryManagerDlg QComboBox::down-arrow {
+    image: none; width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-top: 4px solid #8a8070;
+}
+QDialog#memoryManagerDlg QComboBox QAbstractItemView {
+    background: #181613; color: #c8c0b4;
+    selection-background-color: rgba(200,165,120,22);
+    border: 1px solid rgba(255,255,255,8); outline: none; padding: 4px;
+}
+QDialog#memoryManagerDlg QToolTip {
+    background: #1e1c18; color: #c8c0b4;
+    border: 1px solid rgba(255,255,255,8); padding: 5px 10px; border-radius: 6px;
+}
+
+/* ── Shell ── */
+QFrame#memoryMgrShell {
+    background: #161412;
+    border: 1px solid rgba(255,255,255,5);
+    border-radius: 12px;
+}
+
+/* ── Chrome (title bar) ── */
+QFrame#memoryMgrChrome {
+    background: transparent; border: none;
+    border-bottom: 1px solid rgba(255,255,255,4);
+    border-top-left-radius: 12px; border-top-right-radius: 12px;
+    min-height: 48px;
+}
+QLabel#memoryMgrChromeTitle {
+    font-size: {FS_BODY}px; font-weight: 600;
+    color: #e4ddd4; letter-spacing: 0.01em; background: transparent;
+}
+QLabel#memoryMgrChromeSub {
+    color: #5e5850; background: transparent;
+}
+QLabel#memoryMgrBrand {
+    color: rgba(200,165,120,160); background: transparent;
+}
+QPushButton#memoryMgrChromeClose {
+    background: transparent; color: #6a6258;
+    border: none; border-radius: 6px; font-weight: 600;
+}
+QPushButton#memoryMgrChromeClose:hover {
+    background: rgba(220,80,70,14); color: #e0a0a0;
+}
+QLabel#memoryMgrStats {
+    color: #7a7268;
+    background: rgba(255,255,255,3); padding: 4px 10px;
+    border-radius: 10px; border: none;
+}
+
+/* ── Nav tabs ── */
+QFrame#memoryMgrNav { background: transparent; }
+QPushButton#memoryMgrNavBtn {
+    font-weight: 500; color: #6a6258; background: transparent;
+    border: none; border-radius: 6px;
+    padding: 7px 16px; min-width: 80px;
+}
+QPushButton#memoryMgrNavBtn:hover {
+    color: #a89c8e; background: rgba(255,255,255,3);
+}
+QPushButton#memoryMgrNavBtn:checked {
+    color: #e8e0d6; background: rgba(200,165,120,12); border: none;
+}
+
+/* ── Body & pages ── */
+QFrame#memoryMgrBody {
+    background: transparent;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
+QStackedWidget#memoryMgrStack { background: transparent; }
+QWidget#memoryMgrPage { background: transparent; }
+
+/* ── Cards ── */
+QFrame#memoryMgrCard {
+    background: rgba(255,255,255,2);
+    border: 1px solid rgba(255,255,255,3); border-radius: 10px;
+}
+QLabel#memoryMgrCardTitle {
+    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #5e5850; background: transparent; padding-bottom: 4px;
+}
+
+/* ── List ── */
+QListWidget#memoryMgrList {
+    background: rgba(0,0,0,18);
+    border: 1px solid rgba(255,255,255,3);
+    border-radius: 8px; outline: none;
+    padding: 3px; color: #b0a89c;
+}
+QListWidget#memoryMgrList::item {
+    padding: 9px 12px; border-radius: 6px; margin: 1px 0;
+    border: 1px solid transparent;
+}
+QListWidget#memoryMgrList::item:hover { background: rgba(255,255,255,3); }
+QListWidget#memoryMgrList::item:selected {
+    background: rgba(200,165,120,10);
+    border: 1px solid rgba(200,165,120,18); color: #e4ddd4;
+}
+
+/* ── Filter ── */
+QLineEdit#memoryMgrFilter {
+    background: rgba(0,0,0,18); border: 1px solid rgba(255,255,255,4);
+    border-radius: 8px; padding: 8px 12px; color: #b0a89c;
+}
+QLineEdit#memoryMgrFilter:focus {
+    border-color: rgba(200,165,120,30); background: rgba(0,0,0,24);
+}
+
+/* ── Scroll area ── */
+QScrollArea#memoryMgrScroll { background: transparent; border: none; }
+QWidget#memoryMgrScrollInner { background: transparent; }
+
+/* ── Section labels (visual hierarchy via color, not size) ── */
+QLabel#memoryMgrSection {
+    font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: rgba(200,165,120,140); background: transparent;
+    padding: 14px 0 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,3);
+}
+QLabel#memoryMgrFieldLabel {
+    color: #706860; background: transparent; min-width: 68px;
+}
+QLabel#memoryMgrHint {
+    color: #5e5850;
+    background: rgba(255,255,255,2); border-radius: 6px;
+    padding: 8px 12px; border: 1px solid rgba(255,255,255,3);
+}
+
+/* ── Named inputs ── */
+QLineEdit#memoryMgrLineEdit {
+    background: rgba(255,255,255,4); border: 1px solid rgba(255,255,255,6);
+    border-radius: 6px; padding: 7px 10px; color: #c8c0b4;
+}
+QLineEdit#memoryMgrLineEdit:focus { border-color: rgba(200,165,120,40); }
+QLineEdit#memoryMgrLineReadOnly {
+    background: rgba(255,255,255,2); border: 1px solid rgba(255,255,255,4);
+    border-radius: 6px; padding: 7px 10px; color: #706860;
+    font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+QPlainTextEdit#memoryMgrCodeEdit {
+    background: rgba(255,255,255,3); border: 1px solid rgba(255,255,255,5);
+    border-radius: 8px; padding: 10px 12px; color: #c8c0b4;
+}
+QPlainTextEdit#memoryMgrCodeEdit:focus { border-color: rgba(200,165,120,35); }
+QPlainTextEdit#memoryMgrJsonEdit {
+    background: rgba(0,10,15,40); border: 1px solid rgba(100,140,150,10);
+    border-radius: 8px; padding: 10px 12px; color: #9ac0b8;
+    font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+QPlainTextEdit#memoryMgrJsonEdit:focus { border-color: rgba(100,180,170,30); }
+
+/* ── Splitter ── */
+QSplitter#memoryMgrSplitter::handle {
+    background: rgba(255,255,255,3); width: 3px;
+    border-radius: 1px; margin: 12px 3px;
+}
+QSplitter#memoryMgrSplitter::handle:hover { background: rgba(200,165,120,18); }
+
+/* ── Buttons ── */
+QPushButton#memoryMgrBtnSecondary {
+    font-weight: 500; border-radius: 6px; padding: 6px 14px;
+    background: rgba(255,255,255,4); color: #8a8278;
+    border: 1px solid rgba(255,255,255,5);
+}
+QPushButton#memoryMgrBtnSecondary:hover {
+    background: rgba(255,255,255,7); color: #c8c0b4;
+    border-color: rgba(255,255,255,8);
+}
+QPushButton#memoryMgrBtnPrimary {
+    font-weight: 600; border-radius: 8px; padding: 8px 22px;
+    background: rgba(200,165,120,180); color: #16140f; border: none;
+}
+QPushButton#memoryMgrBtnPrimary:hover { background: rgba(200,165,120,220); }
+QPushButton#memoryMgrBtnDanger {
+    font-weight: 500; border-radius: 8px; padding: 8px 18px;
+    background: rgba(180,60,60,16); color: #c08080;
+    border: 1px solid rgba(180,60,60,20);
+}
+QPushButton#memoryMgrBtnDanger:hover {
+    background: rgba(180,60,60,28); color: #e0a8a8;
+    border-color: rgba(180,60,60,35);
+}
+
+/* ── Footer ── */
+QFrame#memoryMgrFooter {
+    background: transparent;
+    border-top: 1px solid rgba(255,255,255,3);
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
+QPushButton#memoryMgrBtnClose {
+    font-weight: 500; padding: 7px 24px; border-radius: 8px;
+    background: rgba(255,255,255,4); color: #8a8278;
+    border: 1px solid rgba(255,255,255,5);
+}
+QPushButton#memoryMgrBtnClose:hover {
+    background: rgba(255,255,255,7); color: #c8c0b4;
+}
+
+/* ── Sheet dialog ── */
+QDialog#memoryMgrSheetDlg { background: transparent; border: none; }
+QDialog#memoryMgrSheetDlg * {
+    color: #c8c0b4; background-color: transparent;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: {FS_SM}px; outline: none;
+}
+QFrame#memoryMgrSheetShell {
+    background: #1a1816;
+    border: 1px solid rgba(255,255,255,6); border-radius: 14px;
+}
+QLabel#memoryMgrSheetTitle {
+    font-size: {FS_BODY}px; font-weight: 600;
+    color: #e4ddd4; background: transparent;
+}
+QLabel#memoryMgrSheetBody { color: #908880; background: transparent; }
+QPushButton#memoryMgrSheetBtnPrimary {
+    font-weight: 600; border-radius: 8px; padding: 7px 20px; min-width: 72px;
+    background: rgba(200,165,120,180); color: #16140f; border: none;
+}
+QPushButton#memoryMgrSheetBtnPrimary:hover { background: rgba(200,165,120,220); }
+QPushButton#memoryMgrSheetBtnSecondary {
+    font-weight: 500; border-radius: 8px; padding: 7px 18px;
+    background: rgba(255,255,255,5); color: #8a8278;
+    border: 1px solid rgba(255,255,255,6);
+}
+QPushButton#memoryMgrSheetBtnSecondary:hover {
+    background: rgba(255,255,255,8); color: #c8c0b4;
+}
+
+/* ============================================================
    END
    ============================================================ */

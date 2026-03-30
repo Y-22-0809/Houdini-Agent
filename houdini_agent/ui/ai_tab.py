@@ -5242,6 +5242,20 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             resp.set_content(f"❌ 搜索失败: {e}")
             resp.finalize()
 
+    def _slash_memories(self):
+        """/memories — 打开记忆库管理窗口（情景 / 语义 / 策略 增删改查）"""
+        try:
+            from .memory_manager_dialog import MemoryManagerDialog
+            # 直接 exec_，避免依赖 staticmethod exec_centered（旧版模块或热加载缺该方法时会报错）
+            MemoryManagerDialog(self).exec_()
+        except Exception as e:
+            # 不在此处二次 import MemoryMgrSheet：模块未加载全或热加载残留时会再触发 ImportError
+            QtWidgets.QMessageBox.critical(
+                None,
+                tr('memory_mgr.title'),
+                f"{tr('memory_mgr.err_load')}\n{e}",
+            )
+
     def _slash_network(self):
         """/network — 读取网络结构"""
         self._on_read_network()

@@ -347,6 +347,13 @@ class MemoryStore:
         ).fetchall()
         return [self._row_to_episodic(r) for r in rows]
 
+    def delete_episodic(self, record_id: str) -> bool:
+        """删除一条事件记忆"""
+        conn = self._get_conn()
+        cur = conn.execute("DELETE FROM episodic_memory WHERE id=?", (record_id,))
+        conn.commit()
+        return cur.rowcount > 0
+
     # ==========================================================
     # Semantic Memory CRUD
     # ==========================================================
@@ -657,6 +664,13 @@ class MemoryStore:
     def count_procedural(self) -> int:
         conn = self._get_conn()
         return conn.execute("SELECT COUNT(*) FROM procedural_memory").fetchone()[0]
+
+    def delete_procedural(self, record_id: str) -> bool:
+        """删除一条策略记忆"""
+        conn = self._get_conn()
+        cur = conn.execute("DELETE FROM procedural_memory WHERE id=?", (record_id,))
+        conn.commit()
+        return cur.rowcount > 0
 
     def get_procedural_by_name(self, name: str) -> Optional[ProceduralRecord]:
         """按策略名查找"""
