@@ -704,6 +704,8 @@ class ToolCallItem(CollapsibleSection):
         """工具结果中的链接被点击"""
         if url.startswith('houdini://'):
             self.nodePathClicked.emit(url[len('houdini://'):])
+        elif url.startswith(('http://', 'https://')):
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
 
 # ============================================================
@@ -982,7 +984,12 @@ class AIResponse(QtWidgets.QWidget):
         self._pending_text = ""             # 尚未冻结的尾部文本
         self._in_code_fence = False         # 是否在代码块内
         self._code_fence_lang = ""          # 代码块语言
+        self._in_table = False              # 是否在表格连续行内
         self._incremental_enabled = True    # 是否启用增量渲染
+        self._table_flush_timer = QtCore.QTimer(self)
+        self._table_flush_timer.setSingleShot(True)
+        self._table_flush_timer.setInterval(600)
+        self._table_flush_timer.timeout.connect(self._flush_pending_table)
         
         # ★ 顶层水平布局：AuroraBar（左）+ 内容（右）
         outer = QtWidgets.QHBoxLayout(self)
@@ -1212,70 +1219,89 @@ class AIResponse(QtWidgets.QWidget):
         if self._incremental_enabled:
             self._try_freeze_completed()
 
+            # 当 pending 中存在未完结的表格时，启动延时冻结定时器；
+            # 如果持续有新行则不断重置，表格停止增长 600ms 后自动冻结
+            if self._in_table:
+                self._table_flush_timer.start()
+            else:
+                self._table_flush_timer.stop()
+
         # 更新活跃区域显示（只显示未冻结的文本）
         self.content_label.setPlainText(self._pending_text)
-        # setPlainText 会重置 block format，需要重新应用行间距
         self._apply_line_spacing(160)
-        # 光标移到末尾
         cursor = self.content_label.textCursor()
         cursor.movePosition(QtGui.QTextCursor.End)
         self.content_label.setTextCursor(cursor)
 
+    _TABLE_SEP_RE_FREEZE = re.compile(r'^\|?\s*[-:]+[-| :]*$')
+
     def _try_freeze_completed(self):
         """检测并冻结已完成的段落
-        
+
         检测规则：
         - 代码块: ``` 开启 → ``` 关闭，闭合后整个代码块冻结
-        - 文本段落: 两个连续换行 (\n\n) 分隔的文本段落冻结
+        - 文本段落: 两个连续换行 (\\n\\n) 分隔的文本段落冻结
+        - 表格: 表头 + 分隔行 + 数据行，表格后出现非表格行即冻结整段
         """
         text = self._pending_text
         if not text:
             return
 
-        # 按行扫描，寻找可冻结的边界
         lines = text.split('\n')
-        freeze_up_to = -1  # 冻结到第几行（不含）
+        freeze_up_to = -1
         i = 0
         in_fence = self._in_code_fence
+        in_table = self._in_table
 
         while i < len(lines):
-            line = lines[i]
-            stripped = line.strip()
+            stripped = lines[i].strip()
 
+            # --- 代码围栏 ---
             if in_fence:
-                # 在代码块内，检查关闭围栏
                 if stripped.startswith('```'):
                     in_fence = False
-                    # 代码块结束 → 可冻结到此行（含）
                     freeze_up_to = i + 1
                 i += 1
                 continue
 
-            # 检查代码块开启
             if stripped.startswith('```'):
-                # 如果之前有未冻结的文本段落，先冻结它们
-                if i > 0 and freeze_up_to < i:
-                    # 检查代码块之前是否有空行分隔
-                    pass
+                if in_table:
+                    in_table = False
                 in_fence = True
                 self._code_fence_lang = stripped[3:].strip()
+                freeze_up_to = i
                 i += 1
                 continue
 
-            # 检查双换行分隔（空行）
+            # --- 表格状态机 ---
+            if in_table:
+                if stripped and '|' in stripped:
+                    i += 1
+                    continue
+                in_table = False
+                freeze_up_to = i
+                i += 1
+                continue
+
+            # 检测表格开始: 当前行含 | 且下一行是分隔行
+            if (stripped and '|' in stripped
+                    and i + 1 < len(lines)
+                    and self._TABLE_SEP_RE_FREEZE.match(lines[i + 1].strip())):
+                in_table = True
+                i += 1
+                continue
+
+            # --- 空行 = 段落边界 ---
             if not stripped:
-                # 空行 → 如果之前有内容，可以冻结到上一个非空行
                 if i > 0 and freeze_up_to < i:
-                    # 找到一个段落边界
-                    # 但只有在空行之前有实质内容时才冻结
-                    has_content_before = any(lines[j].strip() for j in range(max(0, freeze_up_to + 1 if freeze_up_to >= 0 else 0), i))
-                    if has_content_before:
-                        freeze_up_to = i  # 冻结到空行（含空行）
+                    start_scan = max(0, freeze_up_to + 1 if freeze_up_to >= 0 else 0)
+                    if any(lines[j].strip() for j in range(start_scan, i)):
+                        freeze_up_to = i
             i += 1
 
         self._in_code_fence = in_fence
+        self._in_table = in_table
 
-        # 执行冻结
         if freeze_up_to > 0 and not in_fence:
             frozen_text = '\n'.join(lines[:freeze_up_to])
             remaining_text = '\n'.join(lines[freeze_up_to:])
@@ -1284,6 +1310,17 @@ class AIResponse(QtWidgets.QWidget):
                 self._freeze_text(frozen_text)
 
             self._pending_text = remaining_text
+
+    def _flush_pending_table(self):
+        """定时器触发：表格停止增长后将 pending 中包含表格的内容全部冻结"""
+        if not self._pending_text or not self._in_table:
+            return
+        if not self._pending_text.strip():
+            return
+        self._freeze_text(self._pending_text)
+        self._pending_text = ""
+        self._in_table = False
+        self.content_label.setPlainText("")
 
     def _freeze_text(self, text: str):
         """将一段文本冻结为富文本 Widget"""
@@ -1398,12 +1435,11 @@ class AIResponse(QtWidgets.QWidget):
         ★ 增量渲染模式下，大部分段落已经冻结为 Widget，
         finalize 只需处理最后的 _pending_text 尾部残留。
         """
-        # ★ 停止流光边框
         self.aurora_bar.stop()
+        self._table_flush_timer.stop()
         
         elapsed = time.time() - self._start_time
         
-        # 完成思考区块
         if self._has_thinking:
             self.thinking_section.finalize()
         
@@ -1456,10 +1492,12 @@ class AIResponse(QtWidgets.QWidget):
             self._freeze_text(content)
     
     def _on_link_activated(self, url: str):
-        """处理链接点击 — houdini:// 协议 → nodePathClicked 信号"""
+        """处理链接点击 — houdini:// 跳转节点，http(s):// 用系统浏览器打开"""
         if url.startswith('houdini://'):
             node_path = url[len('houdini://'):]
             self.nodePathClicked.emit(node_path)
+        elif url.startswith(('http://', 'https://')):
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
 
 # ============================================================

@@ -3586,6 +3586,23 @@ class HoudiniMCP:
         """搜索长期记忆库 — 跨层级 chunk 检索"""
         query = args.get("query", "")
         print(f"[search_memory] 收到搜索请求: query={query!r}, args={args}")
+        # ★ 防御性守卫：若全局记忆开关关闭，直接返回空结果，
+        #   防止 agent 绕过工具过滤（例如缓存到的旧 schema）读取记忆。
+        try:
+            from houdini_agent.qt_compat import QSettings
+            _s = QSettings("HoudiniAI", "Assistant")
+            _enabled = _s.value("memory_enabled", False)
+            if isinstance(_enabled, str):
+                _enabled = _enabled.lower() == 'true'
+            if not bool(_enabled):
+                return {
+                    "success": True,
+                    "count": 0,
+                    "memories": [],
+                    "message": "长期记忆系统当前已禁用（用户已在设置中关闭）。",
+                }
+        except Exception:
+            pass
         if not query:
             return {"success": False, "error": "query 参数不能为空"}
 

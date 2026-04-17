@@ -617,6 +617,12 @@ _ZH = {
     'memory_mgr.err_empty_strategy': '策略名称不能为空。',
     'memory_mgr.err_load': '无法打开记忆管理窗口。',
 
+    # ===== Memory Toggle (global switch) =====
+    'memory.menu_label': '长期记忆系统',
+    'memory.menu_tooltip': '启用后，AI 会积累经验并在对话中注入历史偏好；关闭后每次对话都是全新的。默认关闭。',
+    'memory.toggle.enabled': '已启用长期记忆系统',
+    'memory.toggle.disabled': '已关闭长期记忆系统（本次及后续对话不再注入历史经验）',
+
     # ===== Plugin System =====
     'plugin.menu_label': '插件管理',
     'plugin.manager_title': '插件管理',
@@ -1199,6 +1205,12 @@ _EN = {
     'memory_mgr.err_empty_rule': 'Rule text cannot be empty.',
     'memory_mgr.err_empty_strategy': 'Strategy name cannot be empty.',
     'memory_mgr.err_load': 'Could not open the memory manager.',
+
+    # ===== Memory Toggle (global switch) =====
+    'memory.menu_label': 'Long-Term Memory',
+    'memory.menu_tooltip': 'When enabled, the assistant accumulates experience and injects past preferences into each chat. When off, every conversation starts fresh. Off by default.',
+    'memory.toggle.enabled': 'Long-term memory enabled',
+    'memory.toggle.disabled': 'Long-term memory disabled (no past experience will be injected going forward)',
 
     # ===== Plugin System =====
     'plugin.menu_label': 'Plugins',

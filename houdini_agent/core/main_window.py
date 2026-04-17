@@ -180,15 +180,16 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def _save_workspace_once(self):
         """确保退出时只保存一次（aboutToQuit / atexit / closeEvent 都可能触发）"""
-        if self._already_saved:
+        if self._already_saved or self.force_quit:
             return
-        self._already_saved = True  # ★ 不在 finally 中重置，确保只执行一次
+        self._already_saved = True
         try:
             self._save_workspace()
         except Exception as e:
             print(f"[Workspace] Exit save failed: {e}")
     
     def closeEvent(self, event):
-        self._save_workspace()
+        if not self.force_quit:
+            self._save_workspace()
         event.accept()
         super().closeEvent(event)
