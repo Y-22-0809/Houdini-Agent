@@ -71,11 +71,25 @@ def show_tool():
                 _main_window.activateWindow()
                 return _main_window
             else:
+                # 清理旧实例的退出保存回调，防止覆盖新实例的数据
+                try:
+                    import atexit as _atexit
+                    if hasattr(_main_window, 'ai_tab'):
+                        _main_window.ai_tab._destroyed = True
+                        _atexit.unregister(_main_window.ai_tab._atexit_save)
+                    _atexit.unregister(_main_window._atexit_save)
+                    app = QtWidgets.QApplication.instance()
+                    if app:
+                        try:
+                            app.aboutToQuit.disconnect(_main_window._on_app_about_to_quit)
+                        except (TypeError, RuntimeError):
+                            pass
+                except Exception:
+                    pass
                 _main_window.force_quit = True
                 _main_window.close()
                 _main_window.deleteLater()
                 _main_window = None
-                # ★ 不要 processEvents()，它会触发队列中残留的事件导致窗口闪烁
     except Exception:
         _main_window = None
 

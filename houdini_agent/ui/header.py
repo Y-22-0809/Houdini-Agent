@@ -270,6 +270,14 @@ class HeaderMixin:
         menu.addSeparator()
         menu.addAction(tr('rules.menu_label'), self._open_rules_editor)
         menu.addAction(tr('plugin.menu_label'), self._open_plugin_manager)
+
+        # 长期记忆系统全局开关（默认关闭）—— checkable action
+        act_memory = menu.addAction(tr('memory.menu_label'))
+        act_memory.setCheckable(True)
+        act_memory.setChecked(bool(getattr(self, '_memory_enabled', False)))
+        act_memory.setToolTip(tr('memory.menu_tooltip'))
+        act_memory.toggled.connect(self._on_memory_toggle_from_menu)
+
         menu.addSeparator()
         
         # 语言子菜单
@@ -317,6 +325,13 @@ class HeaderMixin:
                 bridge.mount_buttons()
         except Exception:
             pass
+
+    def _on_memory_toggle_from_menu(self, checked: bool):
+        """溢出菜单切换长期记忆系统开关"""
+        try:
+            self.set_memory_enabled(bool(checked))
+        except Exception as e:
+            print(f"[Header] Memory toggle failed: {e}")
 
     def _set_lang_from_menu(self, lang: str):
         """从溢出菜单切换语言"""

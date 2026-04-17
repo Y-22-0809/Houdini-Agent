@@ -155,6 +155,7 @@ class AITab(
         self._session_counter = 0               # 用于生成 tab 标签
         # ★ 纯 Python 备份：tab 顺序和标签名（atexit 时 Qt widget 可能已销毁）
         self._tabs_backup: list = []  # [(session_id, tab_label), ...]
+        self._sessions_saved = False  # _save_all_sessions 是否已成功执行过
         
         # 静态内容缓存（只计算一次，节省 token 和计算时间）
         self._cached_optimized_system_prompt: Optional[str] = None
@@ -178,11 +179,14 @@ class AITab(
         self._reflection_module = None
         self._growth_tracker = None
         self._memory_initialized = False
-        
+        # 全局开关：默认关闭，避免长期记忆把 agent 锁死在某种工作方式上。
+        # 用户在 Header 溢出菜单（···）中可显式启用，状态持久化到 QSettings。
+        self._memory_enabled = self._load_memory_enabled_pref()
+
         # ★ 睡眠机制计数器
         self._sleep_msg_counter = 0       # 当前 session 累计用户消息数
         self._sleep_in_progress = False   # 防止并发睡眠
-        
+
         self._init_memory_system()
         
         # 思考长度限制（已禁用，允许完整思考）
@@ -276,6 +280,8 @@ class AITab(
         # ★ 启动时自动恢复上次的会话（从 sessions_manifest.json）
         self._restore_all_sessions()
         
+        self._destroyed = False
+
         # 定期自动保存（每 60 秒），防止 Houdini 退出时丢失会话
         self._auto_save_timer = QtCore.QTimer(self)
         self._auto_save_timer.timeout.connect(self._periodic_save_all)
@@ -286,7 +292,8 @@ class AITab(
         atexit.register(self._atexit_save)
         app = QtWidgets.QApplication.instance()
         if app:
-            app.aboutToQuit.connect(self._periodic_save_all)
+            app.aboutToQuit.connect(self._save_all_sessions)
+        self.destroyed.connect(self._on_destroyed)
         
         # ★ 启动时静默检查更新（延迟 5 秒，不阻塞初始化）
         QtCore.QTimer.singleShot(5000, self._silent_update_check)
@@ -328,7 +335,11 @@ class AITab(
     # ==========================================================
 
     def _init_memory_system(self):
-        """初始化长期记忆系统（后台线程，不阻塞 UI）"""
+        """初始化长期记忆系统（后台线程，不阻塞 UI）
+
+        注意：初始化始终进行（成本低、允许用户随时打开开关），
+        但实际的注入/反思/睡眠只在 self._memory_enabled 为 True 时触发。
+        """
         def _init():
             try:
                 self._memory_store = get_memory_store()
@@ -336,13 +347,51 @@ class AITab(
                 self._reflection_module = get_reflection_module()
                 self._growth_tracker = get_growth_tracker()
                 self._memory_initialized = True
-                print(f"[Memory] 长期记忆系统已初始化: {self._memory_store.get_stats()}")
+                print(f"[Memory] 长期记忆系统已初始化 (enabled={self._memory_enabled}): "
+                      f"{self._memory_store.get_stats()}")
             except Exception as e:
                 print(f"[Memory] 初始化失败 (非致命): {e}")
                 self._memory_initialized = False
 
         thread = threading.Thread(target=_init, daemon=True)
         thread.start()
+
+    # ---------- 全局开关：记忆系统启用/禁用 ----------
+
+    @staticmethod
+    def _load_memory_enabled_pref() -> bool:
+        """从 QSettings 加载记忆开关（默认 False）。"""
+        settings = QSettings("HoudiniAI", "Assistant")
+        val = settings.value("memory_enabled", False)
+        if isinstance(val, str):
+            return val.lower() == 'true'
+        return bool(val)
+
+    def _save_memory_enabled_pref(self, enabled: bool):
+        settings = QSettings("HoudiniAI", "Assistant")
+        settings.setValue("memory_enabled", bool(enabled))
+
+    def _is_memory_active(self) -> bool:
+        """记忆相关钩子的统一短路条件。
+
+        True 时才应注入 L0 核心记忆、激活分层检索、反思、睡眠以及
+        暴露 search_memory 工具；False 时完全关闭。
+        """
+        return bool(self._memory_enabled and self._memory_initialized and self._memory_store)
+
+    def set_memory_enabled(self, enabled: bool):
+        """切换记忆系统全局开关并持久化。"""
+        enabled = bool(enabled)
+        if enabled == self._memory_enabled:
+            return
+        self._memory_enabled = enabled
+        self._save_memory_enabled_pref(enabled)
+        # 状态栏提示
+        key = 'memory.toggle.enabled' if enabled else 'memory.toggle.disabled'
+        try:
+            self._addStatus.emit(tr(key))
+        except Exception:
+            pass
 
     # ==========================================================
     # ★ 插件系统 (Hook / Plugin System)
@@ -401,7 +450,7 @@ class AITab(
         远低于 sentence-transformers 的 0~1.0。threshold 会在 search_by_level 内部
         自动缩放以适配不同后端。Episodic / Procedural 的 score 阈值也需同样处理。
         """
-        if not self._memory_initialized or not self._memory_store:
+        if not self._is_memory_active():
             return ""
 
         try:
@@ -508,7 +557,7 @@ class AITab(
         从 agent result 中提取信号，创建 episodic 记忆，
         计算 reward，触发规则/LLM 反思。
         """
-        if not self._memory_initialized or not self._reflection_module:
+        if not self._is_memory_active() or not self._reflection_module:
             return
 
         try:
@@ -611,7 +660,7 @@ class AITab(
 
     def _get_personality_injection(self) -> str:
         """获取个性注入文本（附加到 system prompt 末尾）"""
-        if not self._memory_initialized or not self._growth_tracker:
+        if not self._is_memory_active() or not self._growth_tracker:
             return ""
         try:
             return self._growth_tracker.get_personality_description()
@@ -1870,6 +1919,14 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             thinking_text = '\n'.join(thinking_parts).strip() if thinking_parts else ''
             clean_content = re.sub(r'<think>[\s\S]*?</think>', '', final_content).strip()
             clean_content = self._strip_fake_tool_results(clean_content)
+        # 原生 thinking 协议（非 <think> 标签）：从 UI widget 获取已收集的 thinking
+        if not thinking_text and resp and resp._has_thinking:
+            try:
+                ui_thinking = resp.thinking_section._thinking_text.strip()
+                if ui_thinking:
+                    thinking_text = ui_thinking
+            except (AttributeError, RuntimeError):
+                pass
         
         # 确保历史以 assistant 消息结尾（维持 user→assistant 交替）
         # 只要有内容或有工具交互，都需要一条最终 assistant 消息
@@ -1954,7 +2011,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 self._addStatus.emit(f"Cache: {cache_hit}/{cache_hit+cache_miss} ({rate_percent:.0f}%)")
         
         # ★ 反思钩子：任务完成后触发长期记忆反思（后台线程，不阻塞 UI）
-        if self._memory_initialized and tool_calls_history:
+        if self._is_memory_active() and tool_calls_history:
             # 获取 agent_params（从最近的 _run_agent 调用中保存）
             _reflect_params = getattr(self, '_last_agent_params', {})
             def _do_reflect():
@@ -3157,7 +3214,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             return
         
         # ★ 深度睡眠：_manage_context 压缩前整理全部上下文为长期记忆
-        if self._memory_initialized and self._reflection_module and not self._sleep_in_progress:
+        if self._is_memory_active() and self._reflection_module and not self._sleep_in_progress:
             _params = getattr(self, '_last_agent_params', {})
             if _params:
                 self._addStatus.emit("😴 深度睡眠：正在整理全部上下文为长期记忆...")
@@ -3569,7 +3626,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 sys_prompt = sys_prompt + "\n\n" + personality_text
             
             # ★ L0 核心记忆加载：全部加载到 sys_prompt（上限 5 条，按 confidence TopK）
-            if self._memory_initialized and self._memory_store:
+            if self._is_memory_active():
                 try:
                     core_mems = self._memory_store.get_core_memories(max_count=5)
                     if core_mems:
@@ -3731,7 +3788,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             # ================================================================
             # ★ 睡眠机制：浅睡眠（每 N 轮用户提问触发）
             # ================================================================
-            if self._memory_initialized and self._reflection_module:
+            if self._is_memory_active() and self._reflection_module:
                 self._sleep_msg_counter += 1
                 from ..utils.reflection import LIGHT_SLEEP_INTERVAL
                 if self._sleep_msg_counter % LIGHT_SLEEP_INTERVAL == 0 and not self._sleep_in_progress:
@@ -3769,7 +3826,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 
                 if should_compress:
                     # ★ 深度睡眠：压缩前将完整上下文写入长期记忆
-                    if self._memory_initialized and self._reflection_module and not self._sleep_in_progress:
+                    if self._is_memory_active() and self._reflection_module and not self._sleep_in_progress:
                         self._addStatus.emit("😴 深度睡眠：正在整理全部上下文为长期记忆...")
                         try:
                             self._sleep_in_progress = True
@@ -3957,7 +4014,13 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                         tools.append(meta.schema)
             except Exception:
                 pass
-            
+
+            # ★ 记忆开关关闭时，从 tool schema 中剔除 search_memory，
+            #   避免 LLM 在关闭长期记忆的情况下仍调用它读到污染性经验。
+            if not self._is_memory_active():
+                tools = [t for t in tools
+                         if t.get('function', {}).get('name') != 'search_memory']
+
             # ★ 非视觉模型：capture_viewport 降级为仅保存文件（不注入图片）
             # 不再移除工具——AI 仍可截图保存让用户自行查看
             if not supports_vision:
@@ -5837,6 +5900,19 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             'token_stats': self._token_stats.copy(),
         }
 
+    def _on_destroyed(self):
+        """Widget 被销毁时标记，防止旧实例的 atexit/aboutToQuit 回调覆盖新数据"""
+        self._destroyed = True
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app:
+                try:
+                    app.aboutToQuit.disconnect(self._save_all_sessions)
+                except (TypeError, RuntimeError):
+                    pass
+        except Exception:
+            pass
+
     def _periodic_save_all(self):
         """定期保存所有会话（QTimer 触发 + aboutToQuit 触发）"""
         try:
@@ -5860,23 +5936,26 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
         ★ 此时 Qt widget 可能已被销毁，因此：
         - 使用 _tabs_backup（纯 Python 列表）代替遍历 QTabBar
         - 使用 try/except 包裹 todo_list 访问
+        - 如果 aboutToQuit 已成功保存过，则跳过（避免用不完整数据覆盖）
+        - 如果 widget 已被销毁（旧实例），跳过以免覆盖新实例的数据
         """
         try:
+            if getattr(self, '_destroyed', False):
+                return
+            if getattr(self, '_sessions_saved', False):
+                return
             if not hasattr(self, '_sessions') or not self._sessions:
                 return
-            # 尝试同步当前状态（Qt widget 可能已销毁）
+            print(f"[Cache] atexit: 开始保存 (sessions={len(self._sessions)}, backup={len(getattr(self, '_tabs_backup', []))})")
             try:
                 self._save_current_session_state()
             except (RuntimeError, AttributeError):
                 pass
             
-            # ★ 优先使用 _tabs_backup（纯 Python 数据，不依赖 Qt）
             tabs_info = getattr(self, '_tabs_backup', [])
             if not tabs_info:
-                # 如果备份也为空，尝试从 _sessions 字典的 key 中获取
                 tabs_info = [(sid, f"Chat") for sid in self._sessions]
             
-            # 直接写文件，不依赖 Qt 事件循环
             manifest_tabs = []
             for sid, tab_label in tabs_info:
                 if not sid or sid not in self._sessions:
@@ -5884,8 +5963,13 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 sdata = self._sessions[sid]
                 history = sdata.get('conversation_history', [])
                 if not history:
+                    manifest_tabs.append({
+                        'session_id': sid,
+                        'tab_label': tab_label,
+                        'file': '',
+                        'empty': True,
+                    })
                     continue
-                # 收集 todo 数据（widget 可能已销毁）
                 todo_data = []
                 try:
                     todo_list_obj = sdata.get('todo_list')
@@ -5909,17 +5993,29 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                     'tab_label': tab_label,
                     'file': f"session_{sid}.json",
                 })
-            if manifest_tabs:
-                manifest = {
-                    'version': '1.0',
-                    'active_session_id': self._session_id,
-                    'tabs': manifest_tabs,
-                }
-                manifest_file = self._cache_dir / "sessions_manifest.json"
-                with open(manifest_file, 'w', encoding='utf-8') as f:
-                    json.dump(manifest, f, ensure_ascii=False)
+            if not manifest_tabs:
+                return
+            # 防止用更少的 tab 数据覆盖已有的完整 manifest
+            manifest_file = self._cache_dir / "sessions_manifest.json"
+            try:
+                if manifest_file.exists():
+                    import json as _json
+                    with open(manifest_file, 'r', encoding='utf-8') as f:
+                        existing = _json.load(f)
+                    existing_count = len(existing.get('tabs', []))
+                    if existing_count > len(manifest_tabs):
+                        return
+            except Exception:
+                pass
+            manifest = {
+                'version': '1.0',
+                'active_session_id': self._session_id,
+                'tabs': manifest_tabs,
+            }
+            with open(manifest_file, 'w', encoding='utf-8') as f:
+                json.dump(manifest, f, ensure_ascii=False)
         except Exception:
-            pass  # atexit 中不能抛出异常
+            pass
 
     def _save_cache(self) -> bool:
         """自动保存：覆写同 session 文件 + manifest"""
@@ -5962,19 +6058,29 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                 if not sid:
                     continue
                 tab_label = self.session_tabs.tabText(i)
-                # 检查该 session 是否有对话文件存在
                 session_file = self._cache_dir / f"session_{sid}.json"
-                if not session_file.exists():
-                    # 检查 _sessions 字典中是否有对话
+                if session_file.exists():
+                    manifest_tabs.append({
+                        'session_id': sid,
+                        'tab_label': tab_label,
+                        'file': f"session_{sid}.json",
+                    })
+                else:
                     sdata = self._sessions.get(sid, {})
                     history = sdata.get('conversation_history', [])
-                    if not history:
-                        continue
-                manifest_tabs.append({
-                    'session_id': sid,
-                    'tab_label': tab_label,
-                    'file': f"session_{sid}.json",
-                })
+                    if history:
+                        manifest_tabs.append({
+                            'session_id': sid,
+                            'tab_label': tab_label,
+                            'file': f"session_{sid}.json",
+                        })
+                    else:
+                        manifest_tabs.append({
+                            'session_id': sid,
+                            'tab_label': tab_label,
+                            'file': '',
+                            'empty': True,
+                        })
             if manifest_tabs:
                 manifest = {
                     'version': '1.0',
@@ -5989,32 +6095,55 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
 
     def _save_all_sessions(self) -> bool:
         """保存所有打开的会话到磁盘（关闭软件时调用）"""
+        if getattr(self, '_destroyed', False):
+            return False
         try:
             # 先保存当前活跃会话的状态到 _sessions 字典
-            self._save_current_session_state()
+            try:
+                self._save_current_session_state()
+            except (RuntimeError, AttributeError):
+                pass
             # ★ 同步 tab 备份（确保 atexit 时也能用）
-            self._sync_tabs_backup()
+            try:
+                self._sync_tabs_backup()
+            except (RuntimeError, AttributeError):
+                pass
 
             manifest_tabs = []
             active_session_id = self._session_id
 
-            for i in range(self.session_tabs.count()):
-                sid = self.session_tabs.tabData(i)
-                tab_label = self.session_tabs.tabText(i)
+            # 从 QTabBar 获取 tab 列表；如果 Qt widget 已销毁则回退到纯 Python 备份
+            tabs_list = []
+            try:
+                for i in range(self.session_tabs.count()):
+                    sid = self.session_tabs.tabData(i)
+                    tab_label = self.session_tabs.tabText(i)
+                    if sid:
+                        tabs_list.append((sid, tab_label))
+            except (RuntimeError, AttributeError):
+                tabs_list = getattr(self, '_tabs_backup', [])
+
+            for sid, tab_label in tabs_list:
                 if not sid or sid not in self._sessions:
                     continue
 
                 sdata = self._sessions[sid]
                 history = sdata.get('conversation_history', [])
                 if not history:
-                    # ★ 空会话：清理其磁盘上的旧 session 文件（防止残留）
+                    # 空会话：清理磁盘残留，但仍记录到 manifest 以保留标签布局
                     try:
                         old_file = self._cache_dir / f"session_{sid}.json"
                         if old_file.exists():
                             old_file.unlink()
                     except Exception:
                         pass
-                    continue  # 空会话不保存
+                    manifest_tabs.append({
+                        'session_id': sid,
+                        'tab_label': tab_label,
+                        'file': '',
+                        'empty': True,
+                    })
+                    continue
 
                 # 收集 todo 数据（防御 widget 已销毁的情况）
                 todo_data = []
@@ -6048,7 +6177,6 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             if not manifest_tabs:
                 return False
 
-            # 写 manifest 文件
             manifest = {
                 'version': '1.0',
                 'active_session_id': active_session_id,
@@ -6058,8 +6186,8 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             with open(manifest_file, 'w', encoding='utf-8') as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-            # ★ 不再写 cache_latest.json — 恢复由 sessions_manifest + session_*.json 管理
-            # print(f"[Cache] 已保存 {len(manifest_tabs)} 个会话到磁盘")
+            self._sessions_saved = True
+            print(f"[Cache] 已保存 {len(manifest_tabs)} 个会话标签 (tabs_list={len(tabs_list)}, sessions={len(self._sessions)})")
             return True
         except Exception as e:
             print(f"[Cache] 保存所有会话失败: {e}")
@@ -6090,28 +6218,35 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
             for tab_info in tabs_info:
                 sid = tab_info.get('session_id', '')
                 tab_label = tab_info.get('tab_label', 'Chat')
-                session_file = self._cache_dir / tab_info.get('file', '')
+                is_empty = tab_info.get('empty', False)
 
-                if not session_file.exists():
-                    continue
-
-                with open(session_file, 'r', encoding='utf-8') as f:
-                    cache_data = json.load(f)
-
-                history = cache_data.get('conversation_history', [])
-                if not history:
-                    continue
-
-                context_summary = cache_data.get('context_summary', '')
-                todo_data = cache_data.get('todo_data', [])
-                # ★ 从缓存中恢复 token 使用统计
-                saved_token_stats = cache_data.get('token_stats', {
+                history = []
+                context_summary = ''
+                todo_data = []
+                saved_token_stats = {
                     'input_tokens': 0, 'output_tokens': 0,
                     'reasoning_tokens': 0,
                     'cache_read': 0, 'cache_write': 0,
                     'total_tokens': 0, 'requests': 0,
                     'estimated_cost': 0.0,
-                })
+                }
+
+                if not is_empty:
+                    file_name = tab_info.get('file', '')
+                    if not file_name:
+                        continue
+                    session_file = self._cache_dir / file_name
+                    if not session_file.exists():
+                        continue
+                    with open(session_file, 'r', encoding='utf-8') as f:
+                        cache_data = json.load(f)
+                    history = cache_data.get('conversation_history', [])
+                    if not history:
+                        is_empty = True
+                    else:
+                        context_summary = cache_data.get('context_summary', '')
+                        todo_data = cache_data.get('todo_data', [])
+                        saved_token_stats = cache_data.get('token_stats', saved_token_stats)
 
                 if first_tab:
                     # 第一个 tab：加载到已有的初始会话中
@@ -6123,7 +6258,6 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                     self._context_summary = context_summary
                     self._token_stats = saved_token_stats
 
-                    # 更新 sessions 字典
                     if old_id in self._sessions:
                         sdata = self._sessions.pop(old_id)
                         sdata['conversation_history'] = history
@@ -6142,12 +6276,10 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                             'token_stats': saved_token_stats,
                         }
 
-                    # 恢复 todo 数据
                     if todo_data and hasattr(self, 'todo_list') and self.todo_list:
                         self.todo_list.restore_todos(todo_data)
                         self._ensure_todo_in_chat(self.todo_list, self.chat_layout)
 
-                    # 更新标签
                     for i in range(self.session_tabs.count()):
                         if self.session_tabs.tabData(i) == old_id:
                             self.session_tabs.setTabData(i, sid)
@@ -6156,7 +6288,8 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                                 active_tab_index = i
                             break
 
-                    self._render_conversation_history()
+                    if not is_empty:
+                        self._render_conversation_history()
                 else:
                     # 后续 tab：创建新标签
                     self._save_current_session_state()
@@ -6169,7 +6302,6 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                     self.session_tabs.setTabData(tab_index, sid)
 
                     todo = self._create_todo_list(chat_container)
-                    # 恢复 todo 数据
                     if todo_data:
                         todo.restore_todos(todo_data)
                         self._ensure_todo_in_chat(todo, chat_layout)
@@ -6185,36 +6317,36 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                         'token_stats': saved_token_stats,
                     }
 
-                    # 临时切换到该标签以渲染历史
-                    old_scroll = self.scroll_area
-                    old_chat_container = self.chat_container
-                    old_chat_layout = self.chat_layout
-                    old_todo = self.todo_list
-                    old_history = self._conversation_history
-                    old_summary = self._context_summary
-                    old_stats = self._token_stats
-                    old_sid = self._session_id
+                    if not is_empty:
+                        # 临时切换到该标签以渲染历史
+                        old_scroll = self.scroll_area
+                        old_chat_container = self.chat_container
+                        old_chat_layout = self.chat_layout
+                        old_todo = self.todo_list
+                        old_history = self._conversation_history
+                        old_summary = self._context_summary
+                        old_stats = self._token_stats
+                        old_sid = self._session_id
 
-                    self._session_id = sid
-                    self._conversation_history = history
-                    self._context_summary = context_summary
-                    self._token_stats = saved_token_stats
-                    self.scroll_area = scroll_area
-                    self.chat_container = chat_container
-                    self.chat_layout = chat_layout
-                    self.todo_list = todo
+                        self._session_id = sid
+                        self._conversation_history = history
+                        self._context_summary = context_summary
+                        self._token_stats = saved_token_stats
+                        self.scroll_area = scroll_area
+                        self.chat_container = chat_container
+                        self.chat_layout = chat_layout
+                        self.todo_list = todo
 
-                    self._render_conversation_history()
+                        self._render_conversation_history()
 
-                    # 恢复
-                    self._session_id = old_sid
-                    self._conversation_history = old_history
-                    self._context_summary = old_summary
-                    self._token_stats = old_stats
-                    self.scroll_area = old_scroll
-                    self.chat_container = old_chat_container
-                    self.chat_layout = old_chat_layout
-                    self.todo_list = old_todo
+                        self._session_id = old_sid
+                        self._conversation_history = old_history
+                        self._context_summary = old_summary
+                        self._token_stats = old_stats
+                        self.scroll_area = old_scroll
+                        self.chat_container = old_chat_container
+                        self.chat_layout = old_chat_layout
+                        self.todo_list = old_todo
 
                     if sid == active_sid:
                         active_tab_index = tab_index
