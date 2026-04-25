@@ -80,6 +80,8 @@ def count_tokens(text: str, model: str = '') -> int:
 # reasoning: 推理 token 的输出价格（若无则用 output）
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
     # ---- DeepSeek ----
+    'deepseek-v4-flash':    {'input': 0.27,  'input_cache': 0.07,  'output': 1.10},
+    'deepseek-v4-pro':      {'input': 0.55,  'input_cache': 0.14,  'output': 2.19, 'reasoning': 2.19},
     'deepseek-chat':        {'input': 0.27,  'input_cache': 0.07,  'output': 1.10},
     'deepseek-reasoner':    {'input': 0.55,  'input_cache': 0.14,  'output': 2.19, 'reasoning': 2.19},
     # ---- OpenAI ----
@@ -704,7 +706,7 @@ Conversation to summarize:
 
     @classmethod
     def summarize_rounds(cls, ai_client, rounds: list,
-                         model: str = 'deepseek-chat',
+                         model: str = 'deepseek-v4-flash',
                          provider: str = 'deepseek') -> Optional[str]:
         """使用廉价模型生成对话摘要。
 

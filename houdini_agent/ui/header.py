@@ -55,7 +55,7 @@ class HeaderMixin:
         self.model_combo.setObjectName("modelCombo")
         self._model_map = {
             'ollama': ['qwen2.5:14b', 'qwen2.5:7b', 'llama3:8b', 'mistral:7b'],
-            'deepseek': ['deepseek-chat', 'deepseek-reasoner'],
+            'deepseek': ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'],
             'glm': ['glm-4.7'],
             'openai': ['gpt-5.2', 'gpt-5.3-codex'],
             'duojie': [
@@ -102,6 +102,7 @@ class HeaderMixin:
         self._load_custom_provider_config()
         self._model_context_limits = {
             'qwen2.5:14b': 32000, 'qwen2.5:7b': 32000, 'llama3:8b': 8000, 'mistral:7b': 32000,
+            'deepseek-v4-flash': 128000, 'deepseek-v4-pro': 128000,
             'deepseek-chat': 128000, 'deepseek-reasoner': 128000,
             'glm-4.7': 200000,
             'gpt-5.2': 128000,
@@ -143,6 +144,8 @@ class HeaderMixin:
             'llama3:8b':                  {'supports_prompt_caching': True, 'supports_vision': False},
             'mistral:7b':                 {'supports_prompt_caching': True, 'supports_vision': False},
             # DeepSeek
+            'deepseek-v4-flash':          {'supports_prompt_caching': True, 'supports_vision': False},
+            'deepseek-v4-pro':            {'supports_prompt_caching': True, 'supports_vision': False},
             'deepseek-chat':              {'supports_prompt_caching': True, 'supports_vision': False},
             'deepseek-reasoner':          {'supports_prompt_caching': True, 'supports_vision': False},
             # GLM
