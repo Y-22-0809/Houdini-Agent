@@ -34,11 +34,13 @@ User request → AI plans → call tools → inspect results → call more tools
 
 | Provider | Models | Notes |
 |----------|--------|-------|
-| **DeepSeek** | `deepseek-chat`, `deepseek-reasoner` (R1) | Cost-effective, fast, supports Function Calling & reasoning |
+| **DeepSeek** | `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-chat`*, `deepseek-reasoner`* | V4: explicit thinking param + reasoning_effort; *old models deprecated 2026/07/24 |
 | **GLM (Zhipu AI)** | `glm-4.7` | Stable in China, native reasoning & tool calling |
 | **OpenAI** | `gpt-5.2`, `gpt-5.3-codex` | Powerful, full Function Calling & Vision support |
 | **Ollama** (local) | `qwen2.5:14b`, any local model | Privacy-first, auto-detects available models |
 | **Duojie** (relay) | `claude-opus-4-6-gemini`, `claude-opus-4-6-max`, `claude-sonnet-4-5`, `claude-sonnet-4-6`, `gemini-3-flash`, `gemini-3.1-pro`, `glm-5-turbo`, `glm-5.1`, `MiniMax-M2.7`, `MiniMax-M2.7-highspeed` | Claude, Gemini, GLM, MiniMax via relay endpoint |
+| **OpenRouter** | `claude-sonnet-4.6`, `claude-opus-4.6`, `gpt-5.2`, `gemini-2.5-pro`, `deepseek-r1`, `grok-4.1-fast`, `llama-4-maverick`, `qwen3-235b` + 8 more | 16 models from all major providers via single API key |
+| **Custom** | User-configurable | Any OpenAI-compatible endpoint (LM Studio, vLLM, etc.); configurable URL, API Key, model name, context limit, vision & FC support |
 
 ### Vision / Image Input
 
@@ -68,6 +70,7 @@ User request → AI plans → call tools → inspect results → call more tools
 - **Update notification banner** — lightweight banner above the input area when a new version is detected, with "Update Now" and dismiss buttons
 - **Plugin Manager** — tabbed dialog with Plugins, Tools, and Skills management (enable/disable, reload, settings)
 - **Rules Editor** — dialog for creating and managing persistent user context rules
+- **Memory Manager** — dialog for browsing, editing, and exporting long-term semantic memories
 - **PySide2 IME support** — full Chinese/Japanese/Korean input method support on both Windows and macOS
 
 ## Available Tools (40+)
@@ -103,12 +106,18 @@ User request → AI plans → call tools → inspect results → call more tools
 | `check_errors` | Check Houdini node cooking errors and warnings |
 | `verify_and_summarize` | Validate the network and generate a summary report (includes `get_network_structure` — no need to call separately) |
 
+### Visualization
+
+| Tool | Description |
+|------|-------------|
+| `capture_viewport` | Screenshot the 3D viewport — returns base64 JPEG for vision models, or saves to file; configurable resolution (up to 1920×1080) |
+
 ### Code Execution
 
 | Tool | Description |
 |------|-------------|
-| `execute_python` | Run Python code in the Houdini Python Shell (`hou` module available) |
-| `execute_shell` | Run system shell commands (pip, git, ssh, scp, ffmpeg, etc.) with timeout and safety checks |
+| `execute_python` | Run Python code in the Houdini Python Shell (`hou` module available), with stop-event protection and 30s timeout |
+| `execute_shell` | Run system shell commands (pip, git, ssh, scp, ffmpeg, etc.) with timeout, safety checks, and process tree kill protection |
 
 ### Web & Documentation
 
@@ -155,6 +164,12 @@ User request → AI plans → call tools → inspect results → call more tools
 | `add_todo` | Add a task to the Todo list |
 | `update_todo` | Update task status (pending / in_progress / done / error) |
 
+### Long-term Memory
+
+| Tool | Description |
+|------|-------------|
+| `search_memory` | Search the semantic memory store — retrieve relevant past experiences, rules, and strategies by category, abstraction level, and confidence scoring |
+
 ### Plan Mode
 
 | Tool | Description |
@@ -186,7 +201,7 @@ Houdini-Agent/
 ├── launcher.py                      # Entry point (auto-detects Houdini)
 ├── README.md
 ├── README_CN.md
-├── VERSION                          # Semantic version file (e.g. 1.3.4)
+├── VERSION                          # Semantic version file (e.g. 1.5.5)
 ├── lib/                             # Bundled dependencies (requests, urllib3, certifi, tiktoken, …)
 ├── config/                          # Runtime config (auto-created, gitignored)
 │   ├── houdini_ai.ini              # API keys & settings
@@ -230,12 +245,13 @@ Houdini-Agent/
     ├── ui/
     │   ├── ai_tab.py              # AI Agent tab (Mixin host, agent loop, context management, streaming UI)
     │   ├── cursor_widgets.py      # UI widgets (theme, chat blocks, todo, shells, token analytics, plan viewer, plugin manager, rules editor)
-    │   ├── header.py              # HeaderMixin — top settings bar (provider, model, toggles)
+    │   ├── header.py              # HeaderMixin — top settings bar (provider, model, toggles, Custom provider dialog)
     │   ├── input_area.py          # InputAreaMixin — input area, mode switches, @mention, confirm mode
     │   ├── chat_view.py           # ChatViewMixin — chat display, scrolling, toast messages
     │   ├── i18n.py                # Internationalization — bilingual support (Chinese/English)
     │   ├── theme_engine.py        # QSS template rendering & font-size scaling
     │   ├── font_settings_dialog.py # Font zoom slider dialog
+    │   ├── memory_manager_dialog.py # Memory system UI — browse, edit, delete, export memories
     │   └── style_template.qss    # Centralized QSS theme stylesheet
     ├── skills/                     # Pre-built analysis scripts (auto-registered as skill:xxx tools)
     │   ├── __init__.py            # Skill registry, loader & ToolRegistry integration
@@ -551,6 +567,15 @@ Created attribwrangle1 with random Cd attribute on all points.
 
 ## Version History
 
+- **v1.5.5** — **DeepSeek V4 API adaptation + JSON Output**: New `deepseek-v4-flash` / `deepseek-v4-pro` models with explicit `thinking` parameter and `reasoning_effort` support. Old models (`deepseek-chat` / `deepseek-reasoner`) retained for compatibility (deprecated 2026/07/24). Default model migrated to `deepseek-v4-flash`. `chat_stream()` / `chat()` gain `response_format` parameter; reflection module uses `json_object` mode for reliable JSON output. V4 model pricing, context limits, and feature configs added.
+- **v1.5.4** — **Long-term memory global toggle**: Added enable/disable switch for the entire memory system. Multiple fixes.
+- **v1.5.3** — **Memory Manager dialog**: New `MemoryManagerDialog` UI for browsing, editing, deleting, and exporting semantic memories. `/memories` command support.
+- **v1.5.2** — **Progress UX & banner release notes**: Updated progress indicators and update notification banner content.
+- **v1.5.1** — **Wrangle run_over fix**: Fixed wrangle `class` (run_over) mapping to match Houdini parameter menu values.
+- **v1.5.0** — **Custom provider + capture_viewport**: New **Custom Model** provider — user-configurable URL, API Key, model name, context limit, vision & Function Calling support; works with any OpenAI-compatible endpoint (LM Studio, vLLM, etc.). New `capture_viewport` tool for visual verification — screenshots the 3D viewport as base64 JPEG for vision models, or saves to file for non-vision models. `execute_python` gains stop-event protection and 30s timeout. Intent-based tool filtering removed in Agent mode.
+- **v1.4.3** — **Cook deadlock prevention**: Fixed cook-induced deadlock during agent tool execution by deferring Houdini scene evaluation.
+- **v1.4.2** — **MCP client typing fix**: Minor type annotation fix in MCP client module.
+- **v1.4.0** — **OpenRouter provider**: New OpenRouter integration with 16 models spanning Claude, GPT, Gemini, DeepSeek, Grok, Llama, Qwen, Mistral via single API key. Skill parameter type `float` mapped to JSON Schema `number`. Various stability fixes.
 - **v1.3.4** — **ToolRegistry & plugin system overhaul**: New centralized `ToolRegistry` singleton unifying core tools, skills, and plugin tools with mode-based access control (`agent`/`ask`/`plan_planning`/`plan_executing`) and tag classification (`readonly`/`geometry`/`network`/`system`/`docs`/`skill`/`task`/`plugin`). Skills auto-registered as `skill:xxx` tools. User skill directory support (configurable in settings). Plugin Manager refactored to 3-tab UI (Plugins/Tools/Skills) with per-tool enable/disable toggles. Decorator API (`@hook`/`@tool`/`@ui_button`) now properly applied via `_apply_decorators`. MCP Client fallback dispatch to ToolRegistry for `skill:xxx` tools. Mode-based safety guards in `_execute_tool_with_todo` migrated to `ToolRegistry.is_tool_allowed_in_mode()`. macOS thread safety fix: removed `processEvents()` from `BlockingQueuedConnection` slot preventing reentrant crashes; added main-thread assertion; increased tool timeout to 60s. Rules Editor UI redesigned with `QStackedWidget` for empty/editor states, warm khaki theme, and polished layout.
 - **v1.3.3** — **Plugin & IME fixes**: Fixed Plugin Manager "Open Plugins Folder" button (`import os` missing). Comprehensive PySide2 IME fix for macOS Chinese input — overrode `inputMethodQuery` to provide cursor rectangle/surrounding text/position to macOS NSTextInputClient; set `StrongFocus` policy and `ImhNone` hints; enhanced `focusInEvent` to force IME reactivation; added `commitString` fallback in `inputMethodEvent`. Warm khaki theme applied to Plugin Manager and Rules Editor dialogs (previously cold blue/gray). Added `PLUGIN_DEV_GUIDE.md` plugin development documentation.
 - **v1.3.2** — **User Rules system**: Cursor-like custom context rules — UI rules via Rules Editor dialog (create/edit/delete/enable/disable, stored in `config/user_rules.json`) + file rules from `rules/` directory (`.md`/`.txt` auto-loaded). All enabled rules merged and injected as `<user_rules>` into system prompt. Rules integrated into system prompt construction pipeline.
