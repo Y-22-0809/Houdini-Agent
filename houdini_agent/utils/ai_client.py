@@ -2220,8 +2220,8 @@ class AIClient:
             to_summarize = rounds[:-3]
             to_keep = rounds[-3:]
 
-            # 确定摘要模型（优先用 deepseek-chat，否则用当前模型）
-            summary_model = 'deepseek-chat'
+            # 确定摘要模型（优先用 deepseek-v4-flash，否则用当前模型）
+            summary_model = 'deepseek-v4-flash'
             summary_provider = 'deepseek'
             # 检查是否有 deepseek key
             if not self._get_api_key('deepseek'):
@@ -2472,7 +2472,7 @@ class AIClient:
     def _get_default_model(self, provider: str) -> str:
         defaults = {
             'openai': 'gpt-5.2', 
-            'deepseek': 'deepseek-chat', 
+            'deepseek': 'deepseek-v4-flash',
             'glm': 'glm-4.7',
             'ollama': 'qwen2.5:14b',
             'openrouter': 'anthropic/claude-sonnet-4.6',
@@ -2486,14 +2486,15 @@ class AIClient:
     @staticmethod
     def is_reasoning_model(model: str) -> bool:
         """判断模型是否为原生推理模型（API 返回 reasoning_content 字段）
-        
+
         仅限明确通过 reasoning_content 字段返回推理的模型：
-        DeepSeek-R1/Reasoner, GLM-4.7
+        DeepSeek V4 (flash/pro), DeepSeek-R1/Reasoner, GLM-4.7
         注：Duojie 模型思考模式通过系统提示词 <think> 标签实现，不依赖 API 参数
         """
         m = model.lower()
         return (
-            'reasoner' in m or 'r1' in m
+            'deepseek-v4' in m
+            or 'reasoner' in m or 'r1' in m
             or m == 'glm-4.7'
         )
     
@@ -3146,9 +3147,10 @@ class AIClient:
                     max_tokens: Optional[int] = None,
                     tools: Optional[List[dict]] = None,
                     tool_choice: str = 'auto',
-                    enable_thinking: bool = True) -> Generator[Dict[str, Any], None, None]:
+                    enable_thinking: bool = True,
+                    response_format: Optional[dict] = None) -> Generator[Dict[str, Any], None, None]:
         """流式 Chat API
-        
+
         Yields:
             {"type": "content", "content": str}  # 内容片段
             {"type": "tool_call", "tool_call": dict}  # 工具调用
@@ -3190,17 +3192,25 @@ class AIClient:
         }
         if max_tokens:
             payload['max_tokens'] = max_tokens
-        
+        if response_format:
+            payload['response_format'] = response_format
+
         # GLM-4.7 专属参数（仅原生 GLM 接口）：深度思考 + 流式工具调用
         if self.is_glm47(model) and provider == 'glm' and enable_thinking:
             payload['thinking'] = {'type': 'enabled'}
             if tools:
                 payload['tool_stream'] = True
-        
+
+        # DeepSeek V4 thinking 参数（v4-flash / v4-pro 显式启用思考）
+        if provider == 'deepseek' and enable_thinking and 'deepseek-v4' in model.lower():
+            payload['thinking'] = {'type': 'enabled'}
+            if 'v4-pro' in model.lower():
+                payload['reasoning_effort'] = 'high'
+
         # Duojie 中转：思考模式通过系统提示词中的 <think> 标签实现
         # 经测试 thinking/reasoningEffort 参数对 Duojie API 无效（reasoning_tokens 始终为 0）
         # 且 thinking 参数偶尔导致 403，因此不发送任何额外参数
-        
+
         # DeepSeek / OpenAI prompt caching 自动启用（保持前缀稳定即可命中）
         
         # 工具调用（所有支持 function calling 的 provider 通用）
@@ -3564,17 +3574,18 @@ class AIClient:
              max_tokens: Optional[int] = None,
              timeout: int = 60,
              tools: Optional[List[dict]] = None,
-             tool_choice: str = 'auto') -> Dict[str, Any]:
+             tool_choice: str = 'auto',
+             response_format: Optional[dict] = None) -> Dict[str, Any]:
         """非流式 Chat（兼容旧接口）"""
-        
+
         if not HAS_REQUESTS:
             return {'ok': False, 'error': '需要安装 requests 库'}
-        
+
         provider = (provider or 'openai').lower()
         api_key = self._get_api_key(provider)
         if not api_key and provider not in ('ollama', 'custom'):
             return {'ok': False, 'error': f'缺少 API Key'}
-        
+
         payload = {
             'model': model,
             'messages': messages,
@@ -3582,14 +3593,18 @@ class AIClient:
         }
         if max_tokens:
             payload['max_tokens'] = max_tokens
+        if response_format:
+            payload['response_format'] = response_format
         
         # GLM-4.7 专属参数（仅原生 GLM 接口）
         if self.is_glm47(model) and provider == 'glm':
             payload['thinking'] = {'type': 'enabled'}
-        
-        # 注意：非流式 chat() 不包含 enable_thinking 参数，不做 think 模型映射
-        # 思考模式仅在流式 chat_stream() / agent_loop_stream() 中通过 enable_thinking 控制
-        
+
+        # DeepSeek V4-Pro：非流式也启用思考（Pro 的核心能力）
+        if provider == 'deepseek' and 'v4-pro' in model.lower():
+            payload['thinking'] = {'type': 'enabled'}
+            payload['reasoning_effort'] = 'high'
+
         # DeepSeek / OpenAI prompt caching 自动启用
         
         if tools:

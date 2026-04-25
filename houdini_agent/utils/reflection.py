@@ -259,7 +259,7 @@ class ReflectionModule:
         retry_count: int,
         tool_calls: List[Dict],
         ai_client: Any = None,
-        model: str = "deepseek-chat",
+        model: str = "deepseek-v4-flash",
         provider: str = "deepseek",
     ) -> Dict:
         """完整的任务后反思流程
@@ -414,6 +414,7 @@ class ReflectionModule:
                 max_tokens=1500,
                 tools=None,
                 enable_thinking=False,
+                response_format={'type': 'json_object'},
             ):
                 if chunk.get("type") == "content":
                     full_response += chunk.get("content", "")
@@ -826,6 +827,7 @@ class ReflectionModule:
                 max_tokens=max_tokens,
                 tools=None,
                 enable_thinking=False,
+                response_format={'type': 'json_object'},
             ):
                 if chunk.get("type") == "content":
                     full_response += chunk.get("content", "")

@@ -626,7 +626,7 @@ class AITab(
                 retry_count=retry_count,
                 tool_calls=tool_calls,
                 ai_client=self.client,
-                model=agent_params.get('model', 'deepseek-chat'),
+                model=agent_params.get('model', 'deepseek-v4-flash'),
                 provider=agent_params.get('provider', 'deepseek'),
             )
 
@@ -3224,7 +3224,7 @@ SideFX Labs Node Usage Rules (MUST follow strictly):
                         session_id=self._session_id,
                         all_messages=list(history),
                         ai_client=self.client,
-                        model=_params.get('model', 'deepseek-chat'),
+                        model=_params.get('model', 'deepseek-v4-flash'),
                         provider=_params.get('provider', 'deepseek'),
                     )
                     if deep_result.get("success"):
